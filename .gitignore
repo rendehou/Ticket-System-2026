@@ -1,0 +1,7 @@
+test_*
+run-test
+testcases/
+*.exe
+*.out
+*.o
+1867/
