@@ -83,8 +83,8 @@ namespace sjtu{
     };
     using UsernameStr = FixedString<20>;
     using PasswordStr = FixedString<30>;
-    using MailStr     = FixedString<30>;
-    using TrainIDStr  = FixedString<20>;
+    using MailStr = FixedString<30>;
+    using TrainIDStr = FixedString<20>;
 
 };
 
