@@ -1,7 +1,23 @@
-test_*
-run-test
+# 要忽略的文件夹
+1867/
+command/
 testcases/
+
+# 要忽略的测试文件和可执行文件
+run-test
+test_chinese_string
+test_chinese_string.cpp
+test_fixed_string
+test_fixed_string.cpp
+test_min_cs.cpp
+
+# 通用编译产物/临时文件（额外加上，避免以后再出现类似问题）
 *.exe
 *.out
+*.bin
 *.o
-1867/
+*.obj
+*.dSYM/
+.vscode/
+.DS_Store
+Thumbs.db
