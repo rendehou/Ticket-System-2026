@@ -1,3 +1,6 @@
+#ifndef SJTU_PARSER_HPP
+#define SJTU_PARSER_HPP
+
 #include<iostream>
 #include<string>
 #include "./vector/vector.hpp"
@@ -393,3 +396,5 @@ namespace sjtu{
     }
     
 };
+
+#endif

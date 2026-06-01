@@ -11,6 +11,7 @@ namespace sjtu{
         private:
             char data_[N+1];
         public:
+        
             FixedString(){
                 std::memset(data_,0,N+1);
             }
@@ -51,6 +52,9 @@ namespace sjtu{
                 if (len > N) len = N;
                 std::memcpy(data_, s.data(), len);
                 return *this;
+            }
+            std::string to_string() const { 
+                return std::string(data_); 
             }
 
             bool operator== (const FixedString& other) const {return std::strncmp(data_,other.data_,N) == 0;}

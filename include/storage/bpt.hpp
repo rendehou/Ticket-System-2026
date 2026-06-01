@@ -1,7 +1,10 @@
+#ifndef SJTU_BPT_HPP
+#define SJTU_BPT_HPP
 
 #include <iostream>
 #include <fstream>
 #include <cstring>
+#include "../utils/vector/vector.hpp"
 
 using std::string;
 using std::fstream;
@@ -165,22 +168,22 @@ class bpt{
         int root = -1;
         
     public:
-        bpt(){
-            mr.initialise("bpt");
+        bpt(const string& filename = "bpt"){
+            mr.initialise(filename);
             mr.get_info(root,1);
             if (root <= 0) root = -1;
         }
         ~bpt(){
             mr.write_info(root,1);
         }
+        bool empty() const { return root <= 0; }
         void insert(const Key& key, const Value& value);
         void remove(const Key& key, const Value& value);
-        void find(const Key& key);
+        sjtu::vector<Value> find_all(const Key& key);//返回所有匹配的value
         void split_Node(int node_index);
-        int find_(const Key& key, const Value& value);//返回找到的位置
+        int find_(const Key& key, const Value& value);//返回找到的位置（节点index）
         void merge_node(int node_index);
 };
-
 template<class Key, class Value>
 int find_in_Node(const Node<Key, Value>& node, const Data<Key, Value> data_) {
     //这里说明，一共N个标记，对应N+1棵子树，其中对第i个标记，它对应的子树在它前方，子树里的key都小等标记
@@ -389,14 +392,13 @@ void bpt<Key, Value>::insert(const Key& key, const Value& value) {
 }
 
 template<class Key, class Value>
-void bpt<Key, Value>::find(const Key& key) {
+sjtu::vector<Value> bpt<Key, Value>::find_all(const Key& key) {
 
-    int flag = 0;//标记是否找到
+    sjtu::vector<Value> result;
     Data<Key, Value> data_l = Data<Key, Value>(key, Value());//初始化data为最小值，这样查找时才能找到所有的条目
 
     if(root <= 0) {
-        std::cout << "null" << std::endl;
-        return;
+        return result;
     }
 
     int current_index = root;
@@ -408,16 +410,12 @@ void bpt<Key, Value>::find(const Key& key) {
         mr.read(current_Node,current_index);//再读出新子树的位置
     }
 
-    bool first = true;
     bool stop = false;
     while(true) {//这里要沿着叶节点不断循环匹配
         int id = find_in_Node(current_Node, data_l);
         for(int i = id; i < current_Node.size; i++) {//从第一个大于等于data的位置开始匹配
             if(current_Node.data[i].key == key) {
-                if(!first) std::cout << " ";
-                std::cout << current_Node.data[i].value;
-                first = false;
-                flag = 1;
+                result.push_back(current_Node.data[i].value);
             } else { //已经不是一个关键词了，停下
                 stop = true; 
                 break; 
@@ -426,10 +424,7 @@ void bpt<Key, Value>::find(const Key& key) {
         if(stop || current_Node.right == -1) break;//如果没有右兄弟了就结束
         mr.read(current_Node,current_Node.right);//更新到右兄弟继续匹配
     }
-    if(!flag) {
-        std::cout << "null";
-    }
-    std::cout << std::endl;
+    return result;
 }
 
 template<class Key, class Value>
@@ -698,3 +693,5 @@ void bpt<Key, Value>::remove(const Key& key, const Value& value){
         merge_node(node_index);
     }
 }
+
+#endif
