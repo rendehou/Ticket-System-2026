@@ -1,3 +1,4 @@
+#pragma once
 #include <string>
 #include "utils/time.hpp"
 #include "utils/fixed_string.hpp"
@@ -35,7 +36,7 @@ namespace sjtu{
         }
         return cnt;
     }
-
+    
     class Train{
     public:
         TrainIDStr TrainID;
@@ -56,6 +57,8 @@ namespace sjtu{
         int cum_price[101];
         int saleBeginIdx, saleEndIdx;
 
+        int ticket[93][101];//第一个分量代表第几天，第二个分量代表第几站的票
+        
         bool operator<(const Train& o) const { return TrainID < o.TrainID; }
         bool operator==(const Train& o) const { return TrainID == o.TrainID; }
     };
@@ -74,8 +77,9 @@ namespace sjtu{
 
     class Trains{
     private:
-        bpt<TrainIDStr, Train> trainpool{"trainpool"};
         bpt<StationStr, StationEntry> stationIdx{"station_idx"};
+    public:
+        bpt<TrainIDStr, Train> trainpool{"trainpool"};  // TicketSystem 需要读车次
 
         // 预计算前缀和
         void pre(Train& t) {
@@ -104,9 +108,9 @@ namespace sjtu{
         */
         bool add_train(const result& r) {
             Train t;
-            t.TrainID   = TrainIDStr(r.data[7].c_str()); 
+            t.TrainID = TrainIDStr(r.data[7].c_str()); 
             t.stationNum = std::stoi(r.data[8]); 
-            t.seatNum   = std::stoi(r.data[9]); 
+            t.seatNum = std::stoi(r.data[9]); 
             split_stations(r.data[10], t.stations, 100); 
             split_ints(r.data[11], t.prices, 100);   
 
@@ -190,6 +194,13 @@ namespace sjtu{
             Train t = v[0];
             t.released = true;
 
+            // 发布时初始化 ticket 数组 (全部座位可用)
+            for (int day = t.saleBeginIdx; day <= t.saleEndIdx; ++day) {
+                for (int seg = 0; seg < t.stationNum - 1; ++seg) {
+                    t.ticket[day][seg] = t.seatNum;
+                }
+            }
+
             //更新车次数据
             trainpool.remove(id, v[0]);
             trainpool.insert(id, t);
@@ -244,12 +255,71 @@ namespace sjtu{
                     seat_str = "x";
                 } 
                 else {
-                    seat_str = std::to_string(t.seatNum);
+                    seat_str = std::to_string(t.ticket[base_day][i]);
                 }
                 std::cout << t.stations[i] << " " << arr_str << " -> " << dep_str << " " << t.cum_price[i] << " " << seat_str << std::endl;
             }
         }
 
-    };
+        struct TicketCandidate {
+            TrainIDStr trainID;
+            int fromIdx, toIdx;//在火车车站中的编号
+            int price;  
+            int time;
+            int seat;
+            bool operator<(const TicketCandidate& o) const {
+                if (time != o.time) return time < o.time;
+                return trainID < o.trainID;
+            }
+        };
 
+        void query_ticket(const result& r) {
+            /*
+            参数列表 -s -t -d (-p time)
+            查询日期为 -d 时从 -s 出发，并到达 -t 的车票。请注意：这里的日期是列车从 -s 出发的日期，不是从列车始发站出发的日期。
+            -p的值为 time 和 cost 中的一个，若为 time 表示输出按照该车次所需时间从小到大排序，
+            否则按照票价从低到高排序。如果按照时间排序车次所需时间相同，则把 <trainID> 作为第二关键字进行排序，按照票价排序；同理若出现车次票价相同，则同样把 <trainID> 作为第二关键字进行排序。
+
+            第一行输出一个整数，表示符合要求的车次数量。
+            接下来每一行输出一个符合要求的车次，按要求排序。格式为 <trainID> <FROM> <LEAVING_TIME> -> 
+            <TO> <ARRIVING_TIME> <PRICE> <SEAT>，其中出发时间、到达时间格式同 query_train，<FROM> 和 <TO> 为出发站和到达站，<PRICE> 为累计价格，<SEAT> 为最多能购买的票数。
+
+            */
+            int m = std::stoi(r.data[15].substr(0,2));
+            int d = std::stoi(r.data[15].substr(3,2));
+            int date = date_to_day(m,d);
+            StationStr departure,destination;
+            departure = StationStr(r.data[18]);
+            destination = StationStr(r.data[19]);
+            std::string keyword = r.data[21];
+            
+            sjtu::vector<StationEntry> v_departure,v_destination;
+            v_departure = stationIdx.find_all(departure);
+            v_destination = stationIdx.find_all(destination);
+            
+            sjtu::vector<TicketCandidate> candidates;
+            int i = 0, j = 0;
+            while(i < v_departure.size() && j < v_destination.size()) {
+                if(v_departure[i].trainID < v_destination[j].trainID) i++;
+                else if(v_destination[j].trainID < v_departure[i].trainID) j++;
+                else {//代表有重合
+                    if(v_departure[i].stationIndex < v_destination[j].stationIndex){
+                        auto tv = trainpool.find_all(v_departure[i].trainID);
+                        Train t = tv[0];
+                        if(t.released) {
+                            int start_min = time_to_min(t.startHour,t.startMin);
+                            int Origin = date - (start_min + t.depart[v_departure[i].stationIndex]) / 1440;
+                            if (Origin >= t.saleBeginIdx && Origin <= t.saleEndIdx) {
+
+                            }
+                        }
+                    }
+
+                }
+            } 
+        }
+        void query_transfer(const result& r) {
+            // TODO
+        }
+    };
 };

@@ -1,3 +1,4 @@
+#pragma once
 #include <string>
 #include "utils/fixed_string.hpp"
 #include "utils/chinese_string.hpp"
@@ -46,6 +47,9 @@ namespace sjtu{
         public:
         users(){
             online_user.clear();
+        }
+        bool is_online(const UsernameStr& u) const {
+            return online_user.find(u) != online_user.cend();
         }
         bool insert(const result& r){//插入一个用户,0失败1成功
             /*
@@ -147,7 +151,7 @@ namespace sjtu{
             if(v.empty()) return "-1";
             if(p < v[0].pri() && current_username != username) return "-1";
 
-            //读出原用户，只覆盖非空字段
+            //读出原用户
             PasswordStr new_pw  = r.data[3].empty() ? v[0].password() : PasswordStr(r.data[3].c_str());
             NameStr new_nm  = r.data[4].empty() ? v[0].chinesename() : NameStr(r.data[4].c_str());
             MailStr new_mail= r.data[5].empty() ? v[0].mail_() : MailStr(r.data[5].c_str());

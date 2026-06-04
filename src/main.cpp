@@ -2,10 +2,12 @@
 #include <string>
 #include "../include/user.hpp"
 #include "../include/train.hpp"
+#include "../include/ticket.hpp"
 
 int main(){
     sjtu::users us;
     sjtu::Trains ts;
+    sjtu::TicketSystem tks;
 
     while (true) {
         std::string line;
@@ -96,6 +98,32 @@ int main(){
         case sjtu::keywords::QueryTrain:
             std::cout << "[" << r.timestamp_ << "] ";
             ts.query_train(r);
+            break;
+
+        case sjtu::keywords::QueryTicket:
+            std::cout << "[" << r.timestamp_ << "] ";
+            ts.query_ticket(r);
+            break;
+
+        case sjtu::keywords::QueryTransfer:
+            std::cout << "[" << r.timestamp_ << "] ";
+            ts.query_transfer(r);
+            break;
+
+        case sjtu::keywords::BuyTicket: {
+            std::string ret = tks.buy_ticket(r, ts, us);
+            std::cout << "[" << r.timestamp_ << "] " << ret << std::endl;
+            break;
+        }
+
+        case sjtu::keywords::QueryOrder:
+            std::cout << "[" << r.timestamp_ << "] ";
+            tks.query_order(r, us, ts);
+            break;
+
+        case sjtu::keywords::Refund:
+            std::cout << "[" << r.timestamp_ << "] ";
+            tks.refund_ticket(r, ts, us);
             break;
 
         case sjtu::keywords::Clean:

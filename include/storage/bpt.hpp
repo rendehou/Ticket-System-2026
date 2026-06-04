@@ -693,5 +693,4 @@ void bpt<Key, Value>::remove(const Key& key, const Value& value){
         merge_node(node_index);
     }
 }
-
 #endif
