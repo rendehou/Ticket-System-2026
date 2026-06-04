@@ -51,26 +51,18 @@ namespace sjtu{
     };
     class TicketSystem {
     private:
-        // 用户订单：用户名 → 订单列表
+        
         bpt<UsernameStr, Order> orderPool{"order_pool"};
 
-        // 候补队列：(车次, 日期) → 候补条目
         bpt<PendingKey, PendingEntry> pendingPool{"pending_pool"};
 
-    public:
-        // 购票/候补
+    public: 
         std::string buy_ticket(const result& r, Trains& ts, users& us);
-
-        // 查订单
         void query_order(const result& r, users& us, Trains& ts);
-
-        // 退票 + 处理候补
         void refund_ticket(const result& r, Trains& ts, users& us);
 
     private:
-        // 退票后触发：遍历候补队列，能兑现的就兑现
-        void process_pending(Trains& ts, const TrainIDStr& tid,
-                            int dateDay, Train& t);
+        void process_pending(Trains& ts, const TrainIDStr& tid, int dateDay, Train& t);
     };
 };
 
