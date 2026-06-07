@@ -76,7 +76,7 @@ namespace sjtu{
             }
             auto v = userpool.find_all(u.username());
             if(!v.empty() || online_user.find(current_username) == online_user.end()) return 0;
-            if(online_user[current_username] < u.pri()) return 0;
+            if(online_user[current_username] <= u.pri()) return 0;
             userpool.insert(u.username(), u);
             return 1;
         }
@@ -157,7 +157,8 @@ namespace sjtu{
             MailStr new_mail= r.data[5].empty() ? v[0].mail_() : MailStr(r.data[5].c_str());
             int new_g = r.data[6].empty() ? v[0].pri() : std::stoi(r.data[6]);
 
-            if(p <= new_g) return "-1";
+            // -g 如果提供，必须低于 -c 的权限
+            if (!r.data[6].empty() && new_g >= p) return "-1";
             User u(username,new_pw,new_mail,new_g,new_nm);
             //写入修改后的用户到数据库
             userpool.remove(v[0].username(), v[0]);

@@ -242,7 +242,7 @@ namespace sjtu{
             int m = std::stoi(r.data[15].substr(0, 2));
             int d = std::stoi(r.data[15].substr(3, 2));
 
-            // 日期不在运营范围内 (6-8月)
+            //日期不在运营范围内
             if (m < 6 || m > 8) {
                 std::cout << "-1" << std::endl;
                 return;
@@ -256,7 +256,15 @@ namespace sjtu{
 
             Train& t = v[0];
             int base_day = date_to_day(m, d);
+
+            // 日期不在该车次销售区间内
+            if (base_day < t.saleBeginIdx || base_day > t.saleEndIdx) {
+                std::cout << "-1" << std::endl;
+                return;
+            }
+
             int start_min = time_to_min(t.startHour, t.startMin);
+
             std::cout << t.TrainID << " " << t.type << std::endl;
 
             for (int i = 0; i < t.stationNum; ++i) {
@@ -326,6 +334,13 @@ namespace sjtu{
             */
             int m = std::stoi(r.data[15].substr(0,2));
             int d = std::stoi(r.data[15].substr(3,2));
+
+            // 日期不在运营范围内 (6-8月)
+            if (m < 6 || m > 8) {
+                std::cout << "0" << std::endl;
+                return;
+            }
+
             int date = date_to_day(m,d);
             StationStr departure,destination;
             departure = StationStr(r.data[10]);
@@ -339,18 +354,14 @@ namespace sjtu{
             
             sjtu::vector<TicketCandidate> candidates;//所有的待选车
 
-            int i = 0, j = 0;
-            while(i < v_departure.size() && j < v_destination.size()) {
-
-                int dep_id = v_departure[i].stationIndex;
-                int dest_id = v_destination[j].stationIndex;
-                if(v_departure[i].trainID < v_destination[j].trainID) i++;
-                else if(v_destination[j].trainID < v_departure[i].trainID) j++;
-
-                else {//代表有重合
-                    if(dep_id < dest_id){
-                        auto tv = trainpool.find_all(v_departure[i].trainID);
-                        Train t = tv[0];
+            for (int a = 0; a < v_departure.size(); ++a) {
+                for (int b = 0; b < v_destination.size(); ++b) {
+                    if (v_departure[a].trainID == v_destination[b].trainID) {
+                        int dep_id = v_departure[a].stationIndex;
+                        int dest_id = v_destination[b].stationIndex;
+                        if(dep_id < dest_id){
+                            auto tv = trainpool.find_all(v_departure[a].trainID);
+                            Train t = tv[0];
 
                         if(t.released) {
                             int start_min = time_to_min(t.startHour,t.startMin);
@@ -358,7 +369,7 @@ namespace sjtu{
                             if (Origin >= t.saleBeginIdx && Origin <= t.saleEndIdx) {
                                 int remain = get_ticket(t.TrainID,Origin,dep_id,dest_id);
 
-                                if(remain > 0) {
+                                {
                                     TicketCandidate c;
                                     c.trainID = t.TrainID;
                                     c.fromIdx = dep_id;
@@ -371,9 +382,8 @@ namespace sjtu{
                             }
                         }
                     }
-                    i++;
-                    j++;
                 }
+            }
             }
             //冒泡排序，可能需要修改换
             if(sortByTime){
@@ -444,6 +454,13 @@ namespace sjtu{
             //读入并切分输入信息
             int m = std::stoi(r.data[15].substr(0,2));
             int d = std::stoi(r.data[15].substr(3,2));
+
+            // 日期不在运营范围内 (6-8月)
+            if (m < 6 || m > 8) {
+                std::cout << "0" << std::endl;
+                return;
+            }
+
             int date = date_to_day(m,d);
             StationStr from = StationStr(r.data[10]);
             StationStr to = StationStr(r.data[19]);   
@@ -473,11 +490,11 @@ namespace sjtu{
                     StationStr transfer = tv[0].stations[j];
                     auto mid_list = stationIdx.find_all(transfer);
                     
-                    int p = 0,q = 0;//类似query train，使用双指针遍历
-                    while(p < mid_list.size() && q < v_destination.size()) {
-                        if (mid_list[p].trainID < v_destination[q].trainID) p++; 
-                        else if (v_destination[q].trainID < mid_list[p].trainID) q++; 
-                        else {
+                    // 线性搜索 v_destination 中匹配的 trainID
+                    for(int p = 0; p < mid_list.size(); p++) {
+                        for(int q = 0; q < v_destination.size(); q++) {
+                            if(!(mid_list[p].trainID == v_destination[q].trainID)) continue;
+                            
                             TrainIDStr tid2 = v_destination[q].trainID;
                             int midID2 = mid_list[p].stationIndex;
                             int destID2 = v_destination[q].stationIndex;
@@ -501,14 +518,10 @@ namespace sjtu{
                                         if (departM_T2 < arrive_time) {
                                             Origin2++;
                                             if (Origin2 > t2.saleEndIdx) { 
-                                                p++; 
-                                                q++; 
                                                 continue; 
                                             }
                                             departM_T2 = Origin2 * 1440 + start_min2 + t2.depart[midID2];
                                             if (departM_T2 < arrive_time) { 
-                                                p++; 
-                                                q++; 
                                                 continue; 
                                             }
                                         }
@@ -557,8 +570,6 @@ namespace sjtu{
                                 }
                             }
                         }
-                        p++;
-                        q++;
                     }
                 }
             } 

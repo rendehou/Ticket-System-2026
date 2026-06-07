@@ -57,12 +57,12 @@ namespace sjtu{
                 return std::string(data_); 
             }
 
-            bool operator== (const FixedString& other) const {return std::strncmp(data_,other.data_,N) == 0;}
-            bool operator!= (const FixedString& other) const {return std::strncmp(data_,other.data_,N) != 0;}
-            bool operator< (const FixedString& other) const {return std::strncmp(data_, other.data_, N) < 0;}
-            bool operator> (const FixedString& other) const {return std::strncmp(data_, other.data_, N) > 0;}
-            bool operator<= (const FixedString& other) const {return std::strncmp(data_, other.data_, N) <= 0;}
-            bool operator>= (const FixedString& other) const {return std::strncmp(data_, other.data_, N) >= 0;}
+            bool operator== (const FixedString& other) const {return std::strcmp(data_, other.data_) == 0;}
+            bool operator!= (const FixedString& other) const {return std::strcmp(data_, other.data_) != 0;}
+            bool operator< (const FixedString& other) const {return std::strcmp(data_, other.data_) < 0;}
+            bool operator> (const FixedString& other) const {return std::strcmp(data_, other.data_) > 0;}
+            bool operator<= (const FixedString& other) const {return std::strcmp(data_, other.data_) <= 0;}
+            bool operator>= (const FixedString& other) const {return std::strcmp(data_, other.data_) >= 0;}
 
             char& operator[](size_t i){
                 return data_[i];

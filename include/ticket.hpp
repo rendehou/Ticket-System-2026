@@ -227,20 +227,16 @@ namespace sjtu{
             if (!r.data[22].empty()) n = std::stoi(r.data[22]);
             auto orders = orderPool.find_all(username);
 
-            //倒序找n个未退票的订单
-            int count = 0;
+            //倒序找第n个订单
             int targetIdx = -1;
-            for (int i = orders.size() - 1; i >= 0; i--) {
-                if (orders[i].status != 2) {//跳过已退票的
-                    count++;
-                    if (count == n) {
-                        targetIdx = i;
-                        break;
-                    }
+            for (int i = orders.size() - 1, cnt = 1; i >= 0; i--, cnt++) {
+                if (cnt == n) {
+                    targetIdx = i;
+                    break;
                 }
             }
 
-            if (targetIdx == -1 || orders[targetIdx].status != 0) {
+            if (targetIdx == -1 || orders[targetIdx].status == 2) {
                 std::cout << "-1" << std::endl;
                 return;
             }
@@ -253,20 +249,38 @@ namespace sjtu{
                 std::cout << "-1" << std::endl;
                 return;
             }
-            for (int i = target.fromIdx; i < target.toIdx; i++) {
-                TicketKey tk;
-                tk.trainID = target.trainID; tk.day = target.dateDay; tk.seg = i;
-                auto sv = ts.ticketPool.find_all(tk);
-                int newSeat = sv[0] + target.num;
-                ts.ticketPool.remove(tk, sv[0]);
-                ts.ticketPool.insert(tk, newSeat);
+            // 只有 success 订单才释放座位（pending 从未扣过票）
+            if (target.status == 0) {
+                for (int i = target.fromIdx; i < target.toIdx; i++) {
+                    TicketKey tk;
+                    tk.trainID = target.trainID; tk.day = target.dateDay; tk.seg = i;
+                    auto sv = ts.ticketPool.find_all(tk);
+                    int newSeat = sv[0] + target.num;
+                    ts.ticketPool.remove(tk, sv[0]);
+                    ts.ticketPool.insert(tk, newSeat);
+                }
             }
             Order refunded = target;
             refunded.status = 2;
             orderPool.remove(username, target);
             orderPool.insert(username, refunded);
-            //处理候补队列
-            process_pending(ts, target.trainID, target.dateDay);
+
+            // 如果是 pending 订单，从候补队列中删除
+            if (target.status == 1) {
+                PendingKey pk;
+                pk.trainID = target.trainID;
+                pk.dateDay = target.dateDay;
+                PendingEntry pe;
+                pe.timestamp = target.timestamp;
+                pe.username = username;
+                pe.fromIdx = target.fromIdx;
+                pe.toIdx = target.toIdx;
+                pe.num = target.num;
+                pendingPool.remove(pk, pe);
+            } else {
+                // 只有 release 了座位才处理候补队列
+                process_pending(ts, target.trainID, target.dateDay);
+            }
 
             std::cout << "0" << std::endl;
         }
@@ -285,6 +299,17 @@ namespace sjtu{
 
             auto pendingList = pendingPool.find_all(key);
             if (pendingList.empty()) return;
+
+            // 按时间戳排序（优先级：时间戳小的先满足）
+            for (int a = 0; a < pendingList.size(); ++a) {
+                for (int b = a + 1; b < pendingList.size(); ++b) {
+                    if (pendingList[b].timestamp < pendingList[a].timestamp) {
+                        PendingEntry tmp = pendingList[a];
+                        pendingList[a] = pendingList[b];
+                        pendingList[b] = tmp;
+                    }
+                }
+            }
 
             //加载车次
             auto tv = ts.trainpool.find_all(tid);

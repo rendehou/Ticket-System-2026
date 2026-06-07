@@ -22,9 +22,13 @@ inline void day_to_date(int day_idx, int& month, int& day) {
         month = 7;
         day = day_idx - 30 + 1;
     }
-    else {
+    else if (day_idx < 92) {
         month = 8;
         day = day_idx - 61 + 1;
+    }
+    else {
+        month = 9;
+        day = day_idx - 92 + 1;
     }
 }
 
