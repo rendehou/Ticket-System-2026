@@ -300,15 +300,15 @@ namespace sjtu{
             auto pendingList = pendingPool.find_all(key);
             if (pendingList.empty()) return;
 
-            // 按时间戳排序（优先级：时间戳小的先满足）
-            for (int a = 0; a < pendingList.size(); ++a) {
-                for (int b = a + 1; b < pendingList.size(); ++b) {
-                    if (pendingList[b].timestamp < pendingList[a].timestamp) {
-                        PendingEntry tmp = pendingList[a];
-                        pendingList[a] = pendingList[b];
-                        pendingList[b] = tmp;
-                    }
+            // 按时间戳插入排序（优先级：时间戳小的先满足）
+            for (int a = 1; a < pendingList.size(); ++a) {
+                PendingEntry key = pendingList[a];
+                int b = a - 1;
+                while (b >= 0 && pendingList[b].timestamp > key.timestamp) {
+                    pendingList[b + 1] = pendingList[b];
+                    b--;
                 }
+                pendingList[b + 1] = key;
             }
 
             //加载车次

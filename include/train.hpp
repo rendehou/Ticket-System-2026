@@ -354,14 +354,16 @@ namespace sjtu{
             
             sjtu::vector<TicketCandidate> candidates;//所有的待选车
 
-            for (int a = 0; a < v_departure.size(); ++a) {
-                for (int b = 0; b < v_destination.size(); ++b) {
-                    if (v_departure[a].trainID == v_destination[b].trainID) {
-                        int dep_id = v_departure[a].stationIndex;
-                        int dest_id = v_destination[b].stationIndex;
-                        if(dep_id < dest_id){
-                            auto tv = trainpool.find_all(v_departure[a].trainID);
-                            Train t = tv[0];
+            int i = 0, j = 0;
+            while(i < v_departure.size() && j < v_destination.size()) {
+                if(v_departure[i].trainID < v_destination[j].trainID) i++;
+                else if(v_destination[j].trainID < v_departure[i].trainID) j++;
+                else {
+                    int dep_id = v_departure[i].stationIndex;
+                    int dest_id = v_destination[j].stationIndex;
+                    if(dep_id < dest_id){
+                        auto tv = trainpool.find_all(v_departure[i].trainID);
+                        Train t = tv[0];
 
                         if(t.released) {
                             int start_min = time_to_min(t.startHour,t.startMin);
@@ -382,41 +384,32 @@ namespace sjtu{
                             }
                         }
                     }
+                    i++;
+                    j++;
                 }
             }
-            }
-            //冒泡排序，可能需要修改换
+            //插入排序
             if(sortByTime){
-                for (int a = 0; a < candidates.size(); ++a) {
-                    for (int b = a + 1; b < candidates.size(); ++b) {
-                        bool needSwap = false;
-                        if (candidates[a].time > candidates[b].time) {
-                            needSwap = true;
-                        } else if (candidates[a].time == candidates[b].time && candidates[b].trainID < candidates[a].trainID) {
-                            needSwap = true;
-                        }
-                        if (needSwap) {
-                            TicketCandidate tmp = candidates[a];
-                            candidates[a] = candidates[b];
-                            candidates[b] = tmp;
-                        }
+                for (int a = 1; a < candidates.size(); ++a) {
+                    TicketCandidate key = candidates[a];
+                    int b = a - 1;
+                    while (b >= 0 && (candidates[b].time > key.time ||
+                           (candidates[b].time == key.time && candidates[b].trainID > key.trainID))) {
+                        candidates[b + 1] = candidates[b];
+                        b--;
                     }
+                    candidates[b + 1] = key;
                 }
             }else {
-                for (int a = 0; a < candidates.size(); ++a) {
-                    for (int b = a + 1; b < candidates.size(); ++b) {
-                        bool needSwap = false;
-                        if (candidates[a].price > candidates[b].price) {
-                            needSwap = true;
-                        } else if (candidates[a].price == candidates[b].price && candidates[b].trainID < candidates[a].trainID) {
-                            needSwap = true;
-                        }
-                        if (needSwap) {
-                            TicketCandidate tmp = candidates[a];
-                            candidates[a] = candidates[b];
-                            candidates[b] = tmp;
-                        }
+                for (int a = 1; a < candidates.size(); ++a) {
+                    TicketCandidate key = candidates[a];
+                    int b = a - 1;
+                    while (b >= 0 && (candidates[b].price > key.price ||
+                           (candidates[b].price == key.price && candidates[b].trainID > key.trainID))) {
+                        candidates[b + 1] = candidates[b];
+                        b--;
                     }
+                    candidates[b + 1] = key;
                 }
             } 
             std::cout << candidates.size() << std::endl;
@@ -490,11 +483,9 @@ namespace sjtu{
                     StationStr transfer = tv[0].stations[j];
                     auto mid_list = stationIdx.find_all(transfer);
                     
-                    // 线性搜索 v_destination 中匹配的 trainID
                     for(int p = 0; p < mid_list.size(); p++) {
                         for(int q = 0; q < v_destination.size(); q++) {
                             if(!(mid_list[p].trainID == v_destination[q].trainID)) continue;
-                            
                             TrainIDStr tid2 = v_destination[q].trainID;
                             int midID2 = mid_list[p].stationIndex;
                             int destID2 = v_destination[q].stationIndex;
