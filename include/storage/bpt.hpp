@@ -115,13 +115,9 @@ template<class Key, class Value, int N = 50>
 struct Data {//存储键值对
     Key key;
     Value value;
-    Data() {
-        value = Value();
-    }
-    Data(const Key& k, const Value& v) {
-        key = k;
-        value = v;
-    }
+    Data() {}
+    Data(const Key& k) : key(k) {}
+    Data(const Key& k, const Value& v) : key(k), value(v) {}
     Data &operator=(const Data& other) {
         if (this == &other) return *this;
         key = other.key;
@@ -394,7 +390,7 @@ template<class Key, class Value, int N>
 sjtu::vector<Value> bpt<Key, Value, N>::find_all(const Key& key) {
 
     sjtu::vector<Value> result;
-    Data<Key, Value, N> data_l = Data<Key, Value, N>(key, Value());//初始化data为最小值，这样查找时才能找到所有的条目
+    Data<Key, Value, N> data_l(key);
 
     if(root <= 0) {
         return result;
@@ -451,7 +447,7 @@ int bpt<Key, Value, N>::find_(const Key& key, const Value& value) {//重载find�
 template<class Key, class Value, int N>
 bool bpt<Key, Value, N>::find_value(const Key& key, Value& out) {
     if (root <= 0) return false;
-    Data<Key, Value, N> data = Data<Key, Value, N>(key, Value());
+    Data<Key, Value, N> data(key);
     int current_index = root;
     Node<Key, Value, N> current_Node;
     mr.read(current_Node, root);

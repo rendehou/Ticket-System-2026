@@ -369,7 +369,7 @@ namespace sjtu{
                     int dest_id = v_destination[j].stationIndex;
                     if(dep_id < dest_id){
                         auto tv = trainpool.find_all(v_departure[i].trainID);
-                        Train t = tv[0];
+                        Train& t = tv[0];
 
                         if(t.released) {
                             int start_min = time_to_min(t.startHour,t.startMin);
@@ -479,7 +479,7 @@ namespace sjtu{
                 auto tv = trainpool.find_all(tid1);
                 if(!tv[0].released) continue;
 
-                Train t1 = tv[0];
+                Train& t1 = tv[0];
                 int start_min1 = time_to_min(t1.startHour,t1.startMin);
                 int Origin1 = date - (start_min1 + t1.depart[start_station]) / 1440;
                 if (Origin1 < t1.saleBeginIdx || Origin1 > t1.saleEndIdx) continue;
@@ -498,7 +498,7 @@ namespace sjtu{
 
                             if(tid1 != tid2 && midID2 < destID2){
                                 auto tv2 = trainpool.find_all(tid2);
-                                Train t2 = tv2[0];
+                                Train& t2 = tv2[0];
 
                                 if(t2 .released){
                                     //计算时间
