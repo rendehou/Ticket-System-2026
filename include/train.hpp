@@ -8,7 +8,7 @@
 #include "utils/map/src/map.hpp"
 
 namespace sjtu{
-    // 票池 Key: 车次 + 天 + 段
+    // 票池 Key: 车次 + 天 + 段（废弃，改用 TicketDay）
     struct TicketKey {
         TrainIDStr trainID;
         int day;
@@ -21,6 +21,14 @@ namespace sjtu{
         bool operator==(const TicketKey& o) const {
             return trainID == o.trainID && day == o.day && seg == o.seg;
         }
+    };
+    // 票池 Key: 车次 + 天（一次查全部段）
+    struct TicketDay {
+        int seats[100];
+        int segCnt;
+        TicketDay() { segCnt = 0; }
+        bool operator<(const TicketDay& o) const { return false; }
+        bool operator==(const TicketDay& o) const { return true; }
     };
 
     inline int split_stations(const std::string& src, StationStr* out, int maxN) {
@@ -93,7 +101,7 @@ namespace sjtu{
         bpt<StationStr, StationEntry, 100> stationIdx{"station_idx"};
     public:
         bpt<TrainIDStr, Train, 20> trainpool{"trainpool"};
-        bpt<TicketKey, int, 100> ticketPool{"ticket_pool"};  // 独立票池
+        bpt<TicketKey, TicketDay> ticketPool{"ticket_pool"};
 
         // 预计算前缀和
         void pre(Train& t) {
@@ -208,15 +216,18 @@ namespace sjtu{
             Train t = v[0];
             t.released = true;
 
-            // 发布时初始化ticket到独立票池
+            // 发布时初始化ticket：每天一个 TicketDay（含所有段）
             for (int day = t.saleBeginIdx; day <= t.saleEndIdx; ++day) {
+                TicketKey tk;
+                tk.trainID = id;
+                tk.day = day;
+                tk.seg = 0;
+                TicketDay td;
+                td.segCnt = t.stationNum - 1;
                 for (int seg = 0; seg < t.stationNum - 1; ++seg) {
-                    TicketKey tk;
-                    tk.trainID = id;
-                    tk.day = day;
-                    tk.seg = seg;
-                    ticketPool.insert(tk, t.seatNum);
+                    td.seats[seg] = t.seatNum;
                 }
+                ticketPool.insert(tk, td);
             }
 
             //更新车次数据
@@ -265,6 +276,10 @@ namespace sjtu{
 
             int start_min = time_to_min(t.startHour, t.startMin);
 
+            // 一次查询拿当天所有段票数
+            TicketKey tkey; tkey.trainID = id; tkey.day = base_day; tkey.seg = 0;
+            auto tdVec = ticketPool.find_all(tkey);
+
             std::cout << t.TrainID << " " << t.type << std::endl;
 
             for (int i = 0; i < t.stationNum; ++i) {
@@ -290,10 +305,7 @@ namespace sjtu{
                     seat_str = std::to_string(t.seatNum);
                 }
                 else {
-                    TicketKey tk;
-                    tk.trainID = id; tk.day = base_day; tk.seg = i;
-                    auto seatVec = ticketPool.find_all(tk);
-                    seat_str = seatVec.empty() ? std::to_string(t.seatNum) : std::to_string(seatVec[0]);
+                    seat_str = tdVec.empty() ? std::to_string(t.seatNum) : std::to_string(tdVec[0].seats[i]);
                 }
                 std::cout << t.stations[i] << " " << arr_str << " -> " << dep_str << " " << t.cum_price[i] << " " << seat_str << std::endl;
             }
@@ -310,13 +322,13 @@ namespace sjtu{
                 return trainID < o.trainID;
             }
         };
-        int get_ticket(const TrainIDStr& trainID, int date, int dep_station, int des_station) {//查询区间里最少票的段
+        int get_ticket(const TrainIDStr& trainID, int date, int dep_station, int des_station) {
+            TicketKey tk; tk.trainID = trainID; tk.day = date; tk.seg = 0;
+            auto v = ticketPool.find_all(tk);
+            if (v.empty()) return 1e9;
             int min = 1e9;
-            for(int i = dep_station;i < des_station;i++){
-                TicketKey tk;
-                tk.trainID = trainID; tk.day = date; tk.seg = i;
-                auto v = ticketPool.find_all(tk);
-                if (!v.empty() && v[0] < min) min = v[0];
+            for (int i = dep_station; i < des_station; i++) {
+                if (v[0].seats[i] < min) min = v[0].seats[i];
             }
             return min;
         }

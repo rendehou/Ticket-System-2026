@@ -14,101 +14,71 @@ using std::ofstream;
 template<class T, int info_len = 2>
 class MemoryRiver {
 private:
-    /* your code here */
-    fstream file;
+    FILE* fp;
     string file_name;
     int sizeofT = sizeof(T);
-    void ensure_open() {
-        if (!file.is_open()) file.open(file_name,std::ios::in|std::ios::out|std::ios::binary);
-    }
+    char buf[1<<17]; // 128KB buffer
 public:
-    MemoryRiver() = default;
+    MemoryRiver() : fp(nullptr) {}
 
-    MemoryRiver(const string& file_name) : file_name(file_name) {}
+    MemoryRiver(const string& file_name) : file_name(file_name), fp(nullptr) {}
 
     ~MemoryRiver() {
-        if (file.is_open()) file.close();
+        if (fp) fclose(fp);
     }
 
     void initialise(string FN = "") {
         if (FN != "") file_name = FN;
-        if (file.is_open()) file.close();
+        if (fp) { fclose(fp); fp = nullptr; }
         bool exists = false;
         if (!file_name.empty()) {
-            ifstream probe(file_name, std::ios::binary);
-            exists = probe.good();
+            FILE* probe = fopen(file_name.c_str(), "rb");
+            if (probe) { exists = true; fclose(probe); }
         }
         if (!exists) {
-            file.open(file_name, std::ios::out|std::ios::binary|std::ios::trunc);
+            fp = fopen(file_name.c_str(), "wb+");
             int tmp = 0;
             for (int i = 0; i < info_len; ++i)
-                file.write(reinterpret_cast<char *>(&tmp), sizeof(int));
-            file.close();
+                fwrite(&tmp, sizeof(int), 1, fp);
+            fclose(fp);
         }
-        file.open(file_name, std::ios::in|std::ios::out|std::ios::binary);
+        fp = fopen(file_name.c_str(), "r+b");
+        setvbuf(fp, buf, _IOFBF, sizeof(buf));
     }
 
-    //读出第n个int的值赋给tmp，1_base
     void get_info(int &tmp, int n) {
-        if (n > info_len) return;
-        ensure_open();
-        if(!file.is_open()) return;
-        file.clear();
-        file.seekg((n-1)*sizeof(int));
-        file.read(reinterpret_cast<char *>(&tmp), sizeof(int));
-        /* your code here */
+        if (n > info_len || !fp) return;
+        fseek(fp, (n-1)*sizeof(int), SEEK_SET);
+        fread(&tmp, sizeof(int), 1, fp);
     }
 
-    //将tmp写入第n个int的位置，1_base
     void write_info(int tmp, int n) {
-        if (n > info_len) return;
-        ensure_open();
-        if(!file.is_open()) return;
-        file.clear();
-        file.seekp((n-1)*sizeof(int));//注意一会来查一下这里是n还是n-1
-        file.write(reinterpret_cast<char *>(&tmp),sizeof(int));
-        /* your code here */
+        if (n > info_len || !fp) return;
+        fseek(fp, (n-1)*sizeof(int), SEEK_SET);
+        fwrite(&tmp, sizeof(int), 1, fp);
     }
 
-    //在文件合适位置写入类对象t，并返回写入的位置索引index
-    //位置索引意味着当输入正确的位置索引index，在以下三个函数中都能顺利的找到目标对象进行操作
-    //位置索引index可以取为对象写入的起始位置
     int write(T &t) {
-        ensure_open();
-        if(!file.is_open()) return 0;
-        file.clear();
-        file.seekp(0,std::ios::end);
-        int index = file.tellp();
-        file.write(reinterpret_cast<char *>(&t),sizeofT);
+        if (!fp) return 0;
+        fseek(fp, 0, SEEK_END);
+        int index = ftell(fp);
+        fwrite(&t, sizeofT, 1, fp);
         return index;
-        /* your code here */
     }
 
-    //用t的值更新位置索引index对应的对象，保证调用的index都是由write函数产生
     void update(T &t, const int index) {
-        ensure_open();
-        if(!file.is_open()) return;
-        file.clear();
-        file.seekp(index);
-        file.write(reinterpret_cast<char *>(&t),sizeofT);
-        /* your code here */
+        if (!fp) return;
+        fseek(fp, index, SEEK_SET);
+        fwrite(&t, sizeofT, 1, fp);
     }
 
-    //读出位置索引index对应的T对象的值并赋值给t，保证调用的index都是由write函数产生
     void read(T &t, const int index) {
-        ensure_open();
-        if(!file.is_open()) return;
-        file.clear();
-        file.seekg(index);
-        file.read(reinterpret_cast<char *>(&t),sizeofT);
-        /* your code here */
+        if (!fp) return;
+        fseek(fp, index, SEEK_SET);
+        fread(&t, sizeofT, 1, fp);
     }
 
-    //删除位置索引index对应的对象(不涉及空间回收时，可忽略此函数)，保证调用的index都是由write函数产生
-    void Delete(int index) {
-        
-        /* your code here */
-    }
+    void Delete(int index) {}
 };
 
 template<class Key, class Value, int N = 50>

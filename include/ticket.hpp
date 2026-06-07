@@ -100,26 +100,22 @@ namespace sjtu{
             int unitPrice = t.cum_price[toIdx] - t.cum_price[fromIdx];
             int totalPrice = unitPrice * num;
 
+            // 一次查询当天所有段
+            TicketKey tk; tk.trainID = trainID; tk.day = Origin; tk.seg = 0;
+            auto tdVec = ts.ticketPool.find_all(tk);
+
             bool enough = true;
-            for (int i = fromIdx; i < toIdx; i++) {
-                TicketKey tk;
-                tk.trainID = trainID; tk.day = Origin; tk.seg = i;
-                auto sv = ts.ticketPool.find_all(tk);
-                if (sv.empty() || sv[0] < num) {
-                    enough = false;
-                    break;
+            if (!tdVec.empty()) {
+                for (int i = fromIdx; i < toIdx; i++) {
+                    if (tdVec[0].seats[i] < num) { enough = false; break; }
                 }
-            }
+            } else { enough = false; }
 
             if (enough) {
-                for (int i = fromIdx; i < toIdx; i++) {
-                    TicketKey tk;
-                    tk.trainID = trainID; tk.day = Origin; tk.seg = i;
-                    auto sv = ts.ticketPool.find_all(tk);
-                    int newSeat = sv[0] - num;
-                    ts.ticketPool.remove(tk, sv[0]);
-                    ts.ticketPool.insert(tk, newSeat);
-                }
+                TicketDay td = tdVec[0];
+                for (int i = fromIdx; i < toIdx; i++) td.seats[i] -= num;
+                ts.ticketPool.remove(tk, tdVec[0]);
+                ts.ticketPool.insert(tk, td);
 
                 Order o;
                 o.status = 0;
@@ -253,13 +249,13 @@ namespace sjtu{
             }
             //success订单才释放座位
             if (target.status == 0) {
-                for (int i = target.fromIdx; i < target.toIdx; i++) {
-                    TicketKey tk;
-                    tk.trainID = target.trainID; tk.day = target.dateDay; tk.seg = i;
-                    auto sv = ts.ticketPool.find_all(tk);
-                    int newSeat = sv[0] + target.num;
-                    ts.ticketPool.remove(tk, sv[0]);
-                    ts.ticketPool.insert(tk, newSeat);
+                TicketKey tk; tk.trainID = target.trainID; tk.day = target.dateDay; tk.seg = 0;
+                auto tdVec = ts.ticketPool.find_all(tk);
+                if (!tdVec.empty()) {
+                    TicketDay td = tdVec[0];
+                    for (int i = target.fromIdx; i < target.toIdx; i++) td.seats[i] += target.num;
+                    ts.ticketPool.remove(tk, tdVec[0]);
+                    ts.ticketPool.insert(tk, td);
                 }
             }
             Order refunded = target;
@@ -313,32 +309,24 @@ namespace sjtu{
                 pendingList[b + 1] = key;
             }
 
-            //加载车次
-            auto tv = ts.trainpool.find_all(tid);
-            if (tv.empty()) return;
+            //一次查询当天所有段
+            TicketKey pkey; pkey.trainID = tid; pkey.day = dateDay; pkey.seg = 0;
+            auto tdVec = ts.ticketPool.find_all(pkey);
+            if (tdVec.empty()) return;
+            TicketDay td = tdVec[0];
+            bool modified = false;
+
             for (int idx = 0; idx < pendingList.size(); idx++) {
                 PendingEntry& pe = pendingList[idx];
 
                 //检查余票是否足够
                 bool enough = true;
                 for (int i = pe.fromIdx; i < pe.toIdx; i++) {
-                    TicketKey tk;
-                    tk.trainID = tid; tk.day = dateDay; tk.seg = i;
-                    auto sv = ts.ticketPool.find_all(tk);
-                    if (sv.empty() || sv[0] < pe.num) {
-                        enough = false;
-                        break;
-                    }
+                    if (td.seats[i] < pe.num) { enough = false; break; }
                 }
                 if (!enough) continue;
-                for (int i = pe.fromIdx; i < pe.toIdx; i++) {
-                    TicketKey tk;
-                    tk.trainID = tid; tk.day = dateDay; tk.seg = i;
-                    auto sv = ts.ticketPool.find_all(tk);
-                    int newSeat = sv[0] - pe.num;
-                    ts.ticketPool.remove(tk, sv[0]);
-                    ts.ticketPool.insert(tk, newSeat);
-                }
+                for (int i = pe.fromIdx; i < pe.toIdx; i++) td.seats[i] -= pe.num;
+                modified = true;
 
                 // 从候补队列删除
                 pendingPool.remove(key, pe);
@@ -355,6 +343,11 @@ namespace sjtu{
                         break;
                     }
                 }
+            }
+            // 写回修改后的 TicketDay
+            if (modified) {
+                ts.ticketPool.remove(pkey, tdVec[0]);
+                ts.ticketPool.insert(pkey, td);
             }
         }
     };
