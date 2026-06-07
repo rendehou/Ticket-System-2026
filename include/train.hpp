@@ -292,8 +292,8 @@ namespace sjtu{
                 else {
                     TicketKey tk;
                     tk.trainID = id; tk.day = base_day; tk.seg = i;
-                    int seat;
-                    seat_str = ticketPool.find_value(tk, seat) ? std::to_string(seat) : std::to_string(t.seatNum);
+                    auto seatVec = ticketPool.find_all(tk);
+                    seat_str = seatVec.empty() ? std::to_string(t.seatNum) : std::to_string(seatVec[0]);
                 }
                 std::cout << t.stations[i] << " " << arr_str << " -> " << dep_str << " " << t.cum_price[i] << " " << seat_str << std::endl;
             }
