@@ -8,25 +8,21 @@
 #include "utils/map/src/map.hpp"
 
 namespace sjtu{
-    // 票池 Key: 车次 + 天 + 段（废弃，改用 TicketDay）
+    // 票池 Key: 车次 + 天（一次查全部段）
     struct TicketKey {
         TrainIDStr trainID;
         int day;
-        int seg;
         bool operator<(const TicketKey& o) const {
             if (trainID != o.trainID) return trainID < o.trainID;
-            if (day != o.day) return day < o.day;
-            return seg < o.seg;
+            return day < o.day;
         }
         bool operator==(const TicketKey& o) const {
-            return trainID == o.trainID && day == o.day && seg == o.seg;
+            return trainID == o.trainID && day == o.day;
         }
     };
-    // 票池 Key: 车次 + 天（一次查全部段）
     struct TicketDay {
         int seats[100];
-        int segCnt;
-        TicketDay() { segCnt = 0; }
+        TicketDay() { for(int i=0;i<100;i++) seats[i]=0; }
         bool operator<(const TicketDay& o) const { return false; }
         bool operator==(const TicketDay& o) const { return true; }
     };
@@ -216,14 +212,12 @@ namespace sjtu{
             Train t = v[0];
             t.released = true;
 
-            // 发布时初始化ticket：每天一个 TicketDay（含所有段）
+            // 发布时初始化ticket每天一个 TicketDay类票
             for (int day = t.saleBeginIdx; day <= t.saleEndIdx; ++day) {
                 TicketKey tk;
                 tk.trainID = id;
                 tk.day = day;
-                tk.seg = 0;
                 TicketDay td;
-                td.segCnt = t.stationNum - 1;
                 for (int seg = 0; seg < t.stationNum - 1; ++seg) {
                     td.seats[seg] = t.seatNum;
                 }
@@ -277,7 +271,7 @@ namespace sjtu{
             int start_min = time_to_min(t.startHour, t.startMin);
 
             // 一次查询拿当天所有段票数
-            TicketKey tkey; tkey.trainID = id; tkey.day = base_day; tkey.seg = 0;
+            TicketKey tkey; tkey.trainID = id; tkey.day = base_day;
             auto tdVec = ticketPool.find_all(tkey);
 
             std::cout << t.TrainID << " " << t.type << std::endl;
@@ -323,9 +317,9 @@ namespace sjtu{
             }
         };
         int get_ticket(const TrainIDStr& trainID, int date, int dep_station, int des_station) {
-            TicketKey tk; tk.trainID = trainID; tk.day = date; tk.seg = 0;
+            TicketKey tk; tk.trainID = trainID; tk.day = date;
             auto v = ticketPool.find_all(tk);
-            if (v.empty()) return 1e9;
+            if (v.empty()) return 0;
             int min = 1e9;
             for (int i = dep_station; i < des_station; i++) {
                 if (v[0].seats[i] < min) min = v[0].seats[i];

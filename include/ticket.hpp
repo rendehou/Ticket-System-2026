@@ -101,7 +101,7 @@ namespace sjtu{
             int totalPrice = unitPrice * num;
 
             // 一次查询当天所有段
-            TicketKey tk; tk.trainID = trainID; tk.day = Origin; tk.seg = 0;
+            TicketKey tk; tk.trainID = trainID; tk.day = Origin;
             auto tdVec = ts.ticketPool.find_all(tk);
 
             bool enough = true;
@@ -249,7 +249,7 @@ namespace sjtu{
             }
             //success订单才释放座位
             if (target.status == 0) {
-                TicketKey tk; tk.trainID = target.trainID; tk.day = target.dateDay; tk.seg = 0;
+                TicketKey tk; tk.trainID = target.trainID; tk.day = target.dateDay;
                 auto tdVec = ts.ticketPool.find_all(tk);
                 if (!tdVec.empty()) {
                     TicketDay td = tdVec[0];
@@ -310,7 +310,7 @@ namespace sjtu{
             }
 
             //一次查询当天所有段
-            TicketKey pkey; pkey.trainID = tid; pkey.day = dateDay; pkey.seg = 0;
+            TicketKey pkey; pkey.trainID = tid; pkey.day = dateDay;
             auto tdVec = ts.ticketPool.find_all(pkey);
             if (tdVec.empty()) return;
             TicketDay td = tdVec[0];
