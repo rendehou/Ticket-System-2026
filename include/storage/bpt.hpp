@@ -180,6 +180,7 @@ class bpt{
         sjtu::vector<Value> find_all(const Key& key);//返回所有匹配的value
         void split_Node(int node_index);
         int find_(const Key& key, const Value& value);//返回找到的位置（节点index）
+        bool find_value(const Key& key, Value& out);//直接返回值，跳过vector
         void merge_node(int node_index);
 };
 template<class Key, class Value, int N = 50>
@@ -445,6 +446,28 @@ int bpt<Key, Value, N>::find_(const Key& key, const Value& value) {//重载find�
     if(id < current_Node.size && current_Node.data[id] == data) return current_index;
     
     return -1;
+}
+
+template<class Key, class Value, int N>
+bool bpt<Key, Value, N>::find_value(const Key& key, Value& out) {
+    if (root <= 0) return false;
+    Data<Key, Value, N> data = Data<Key, Value, N>(key, Value());
+    int current_index = root;
+    Node<Key, Value, N> current_Node;
+    mr.read(current_Node, root);
+    while (!current_Node.is_leaf) {
+        int id = find_child_in_Node(current_Node, data);
+        current_index = current_Node.children[id];
+        mr.read(current_Node, current_index);
+    }
+    // 叶子节点线性扫描（避免二分搜索的值比较问题）
+    for (int i = 0; i < current_Node.size; i++) {
+        if (current_Node.data[i].key == key) {
+            out = current_Node.data[i].value;
+            return true;
+        }
+    }
+    return false;
 }
 
 template<class Key, class Value, int N>

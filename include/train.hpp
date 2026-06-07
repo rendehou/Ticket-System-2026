@@ -93,7 +93,7 @@ namespace sjtu{
         bpt<StationStr, StationEntry, 100> stationIdx{"station_idx"};
     public:
         bpt<TrainIDStr, Train, 20> trainpool{"trainpool"};
-        bpt<TicketKey, int, 400> ticketPool{"ticket_pool"};  // 独立票池
+        bpt<TicketKey, int, 100> ticketPool{"ticket_pool"};  // 独立票池
 
         // 预计算前缀和
         void pre(Train& t) {
@@ -292,8 +292,8 @@ namespace sjtu{
                 else {
                     TicketKey tk;
                     tk.trainID = id; tk.day = base_day; tk.seg = i;
-                    auto seatVec = ticketPool.find_all(tk);
-                    seat_str = seatVec.empty() ? std::to_string(t.seatNum) : std::to_string(seatVec[0]);
+                    int seat;
+                    seat_str = ticketPool.find_value(tk, seat) ? std::to_string(seat) : std::to_string(t.seatNum);
                 }
                 std::cout << t.stations[i] << " " << arr_str << " -> " << dep_str << " " << t.cum_price[i] << " " << seat_str << std::endl;
             }
