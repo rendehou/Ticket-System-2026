@@ -182,18 +182,27 @@ namespace sjtu{
 
             //输出
             std::cout << orders.size() << std::endl;
+            TrainIDStr lastTid; bool hasCache = false;
+            Train cacheTrain;
             for (int i = orders.size() - 1; i >= 0; i--) {
                 Order& o = orders[i];
-
-
                 const char* statusStr;
                 if (o.status == 0) statusStr = "success";
                 else if (o.status == 1) statusStr = "pending";
                 else statusStr = "refunded";
 
-                auto tv = ts.trainpool.find_all(o.trainID);
-                if (tv.empty()) continue;
-                Train& t = tv[0];
+                Train* tp;
+                if (hasCache && o.trainID == lastTid) {
+                    tp = &cacheTrain;
+                } else {
+                    auto tv = ts.trainpool.find_all(o.trainID);
+                    if (tv.empty()) continue;
+                    cacheTrain = tv[0];
+                    lastTid = o.trainID;
+                    hasCache = true;
+                    tp = &cacheTrain;
+                }
+                Train& t = *tp;
                 int startMin = time_to_min(t.startHour, t.startMin);
 
                 int departAbs = o.dateDay * 1440 + startMin + t.depart[o.fromIdx];
