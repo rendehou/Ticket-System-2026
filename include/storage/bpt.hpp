@@ -111,9 +111,7 @@ public:
     }
 };
 
-constexpr int N = 50;//N叉树
-
-template<class Key, class Value>
+template<class Key, class Value, int N = 50>
 struct Data {//存储键值对
     Key key;
     Value value;
@@ -148,10 +146,10 @@ struct Data {//存储键值对
     }
 };
 
-template<class Key, class Value>
+template<class Key, class Value, int N = 50>
 struct Node {//树的节点
     bool is_leaf = 0;//是否为叶子节点
-    Data<Key, Value> data[N+1];
+    Data<Key, Value, N> data[N+1];
     //多给一个的空间，这样在插入时就不需要考虑满了之后的情况了，直接插入，等插入完了再分裂，实际上每个节点范围为N/2到N
     int size = 0;//存了多少了,这里指的是标记
     int parent = -1;
@@ -161,10 +159,10 @@ struct Node {//树的节点
     Node() = default;
 };
 
-template<class Key, class Value>
+template<class Key, class Value, int N = 50>
 class bpt{
     private:
-        MemoryRiver<Node<Key, Value>,2> mr;
+        MemoryRiver<Node<Key, Value, N>,2> mr;
         int root = -1;
         
     public:
@@ -184,8 +182,8 @@ class bpt{
         int find_(const Key& key, const Value& value);//返回找到的位置（节点index）
         void merge_node(int node_index);
 };
-template<class Key, class Value>
-int find_in_Node(const Node<Key, Value>& node, const Data<Key, Value> data_) {
+template<class Key, class Value, int N = 50>
+int find_in_Node(const Node<Key, Value, N>& node, const Data<Key, Value, N> data_) {
     //这里说明，一共N个标记，对应N+1棵子树，其中对第i个标记，它对应的子树在它前方，子树里的key都小等标记
     int l = 0, r = node.size - 1;
     while (l <= r) {
@@ -197,8 +195,8 @@ int find_in_Node(const Node<Key, Value>& node, const Data<Key, Value> data_) {
     return l;//返回node中第一个大于等于data的位置，如果没有则返回node尾部
 }
 
-template<class Key, class Value>
-int find_child_in_Node(const Node<Key, Value>& node, const Data<Key, Value> data_) {
+template<class Key, class Value, int N = 50>
+int find_child_in_Node(const Node<Key, Value, N>& node, const Data<Key, Value, N> data_) {
     //内部节点向下走时用upper_bound，返回第一个大于data的位置
     int l = 0, r = node.size - 1;
     while (l <= r) {
@@ -209,14 +207,14 @@ int find_child_in_Node(const Node<Key, Value>& node, const Data<Key, Value> data
     return l;
 }
 
-template<class Key, class Value>
-void bpt<Key, Value>::split_Node(int node_index){
-    Node<Key, Value> node;
+template<class Key, class Value, int N>
+void bpt<Key, Value, N>::split_Node(int node_index){
+    Node<Key, Value, N> node;
     mr.read(node, node_index);
 
-    Node<Key, Value> new_splited_Node;//在右侧新分出一块
+    Node<Key, Value, N> new_splited_Node;//在右侧新分出一块
     int new_splited_Node_index;
-    Data<Key, Value> up_data;
+    Data<Key, Value, N> up_data;
     new_splited_Node.is_leaf = node.is_leaf;
 
     if(node.is_leaf) {//是叶子就只改变data
@@ -238,7 +236,7 @@ void bpt<Key, Value>::split_Node(int node_index){
 
         //如果有后继要修改后继指针
         if(new_splited_Node.right != -1) {
-            Node<Key, Value> node_right;
+            Node<Key, Value, N> node_right;
             mr.read(node_right, new_splited_Node.right);
             node_right.left = new_splited_Node_index;
             mr.update(node_right, new_splited_Node.right);
@@ -271,7 +269,7 @@ void bpt<Key, Value>::split_Node(int node_index){
         node.right = new_splited_Node_index;
         mr.update(node, node_index);
         if(new_splited_Node.right != -1) {
-            Node<Key, Value> node_right;
+            Node<Key, Value, N> node_right;
             mr.read(node_right, new_splited_Node.right);
             node_right.left = new_splited_Node_index;
             mr.update(node_right, new_splited_Node.right);
@@ -281,7 +279,7 @@ void bpt<Key, Value>::split_Node(int node_index){
         for(int i = 0; i < right_size + 1; i++) {
             int child_index = new_splited_Node.children[i];
             if(child_index == -1) continue;
-            Node<Key, Value> child_node;
+            Node<Key, Value, N> child_node;
             mr.read(child_node, child_index);
             child_node.parent = new_splited_Node_index;
             mr.update(child_node, child_index);
@@ -292,8 +290,8 @@ void bpt<Key, Value>::split_Node(int node_index){
     if(node.parent == -1){//要创造新根
 
         //建立新根
-        Data<Key, Value> up_key = up_data;
-        Node<Key, Value> new_root;//建立新根
+        Data<Key, Value, N> up_key = up_data;
+        Node<Key, Value, N> new_root;//建立新根
         new_root.data[0] = up_key;
         new_root.size = 1;
         new_root.is_leaf = 0;
@@ -311,7 +309,7 @@ void bpt<Key, Value>::split_Node(int node_index){
     }
 
     else {//不是孤点，直接把提升的key插入父亲节点
-        Node<Key, Value> parent_node;
+        Node<Key, Value, N> parent_node;
         mr.read(parent_node, node.parent);//读出父亲节点
         int id_in_parent = find_in_Node(parent_node, up_data);
 
@@ -343,13 +341,13 @@ void bpt<Key, Value>::split_Node(int node_index){
     }
 }
 
-template<class Key, class Value>
-void bpt<Key, Value>::insert(const Key& key, const Value& value) {
+template<class Key, class Value, int N>
+void bpt<Key, Value, N>::insert(const Key& key, const Value& value) {
 
-    Data<Key, Value> data = Data<Key, Value>(key, value);
+    Data<Key, Value, N> data = Data<Key, Value, N>(key, value);
 
     if(root <= 0) {
-        Node<Key, Value> new_node;
+        Node<Key, Value, N> new_node;
         new_node.is_leaf = 1;//插入根,是根又是叶
         new_node.data[0] = data;//data 0-based
         new_node.size = 1;
@@ -359,7 +357,7 @@ void bpt<Key, Value>::insert(const Key& key, const Value& value) {
     }
 
     int current_index = root;
-    Node<Key, Value> current_Node;
+    Node<Key, Value, N> current_Node;
     mr.read(current_Node,root);//读出根，从根开始匹配
 
     while(!current_Node.is_leaf) {
@@ -391,18 +389,18 @@ void bpt<Key, Value>::insert(const Key& key, const Value& value) {
 
 }
 
-template<class Key, class Value>
-sjtu::vector<Value> bpt<Key, Value>::find_all(const Key& key) {
+template<class Key, class Value, int N>
+sjtu::vector<Value> bpt<Key, Value, N>::find_all(const Key& key) {
 
     sjtu::vector<Value> result;
-    Data<Key, Value> data_l = Data<Key, Value>(key, Value());//初始化data为最小值，这样查找时才能找到所有的条目
+    Data<Key, Value, N> data_l = Data<Key, Value, N>(key, Value());//初始化data为最小值，这样查找时才能找到所有的条目
 
     if(root <= 0) {
         return result;
     }
 
     int current_index = root;
-    Node<Key, Value> current_Node;
+    Node<Key, Value, N> current_Node;
     mr.read(current_Node,root);//读出根，从根开始匹配，这个与insert类似
     while(!current_Node.is_leaf) {
         int id = find_child_in_Node(current_Node, data_l);
@@ -427,11 +425,11 @@ sjtu::vector<Value> bpt<Key, Value>::find_all(const Key& key) {
     return result;
 }
 
-template<class Key, class Value>
-int bpt<Key, Value>::find_(const Key& key, const Value& value) {//重载find函数，返回一个Node，如果没有找到就返回一个空Node
-    Data<Key, Value> data = Data<Key, Value>(key, value);
+template<class Key, class Value, int N>
+int bpt<Key, Value, N>::find_(const Key& key, const Value& value) {//重载find函数，返回一个Node，如果没有找到就返回一个空Node
+    Data<Key, Value, N> data = Data<Key, Value, N>(key, value);
     int current_index = root;
-    Node<Key, Value> current_Node;
+    Node<Key, Value, N> current_Node;
     if(root <= 0) {
         return -1;
     }
@@ -449,16 +447,16 @@ int bpt<Key, Value>::find_(const Key& key, const Value& value) {//重载find函�
     return -1;
 }
 
-template<class Key, class Value>
-void bpt<Key, Value>::merge_node(int node_index) {
-    Node<Key, Value> node;
+template<class Key, class Value, int N>
+void bpt<Key, Value, N>::merge_node(int node_index) {
+    Node<Key, Value, N> node;
     mr.read(node, node_index);
     if(node.parent == -1) {
         //如果是根节点
         if(!node.is_leaf && node.size == 0) {
             //根节点为空，且有一个孩子，则孩子成为新根
             root = node.children[0];
-            Node<Key, Value> root_node;
+            Node<Key, Value, N> root_node;
             mr.read(root_node, root);
             root_node.parent = -1;
             mr.update(root_node, root);
@@ -470,7 +468,7 @@ void bpt<Key, Value>::merge_node(int node_index) {
         return;
     }
 
-    Node<Key, Value> parent_node;
+    Node<Key, Value, N> parent_node;
     mr.read(parent_node, node.parent);
     int child_pos = -1;
     for(int i = 0; i <= parent_node.size; i++) {
@@ -480,7 +478,7 @@ void bpt<Key, Value>::merge_node(int node_index) {
         }
     }
 
-    Node<Key, Value> left_node, right_node;
+    Node<Key, Value, N> left_node, right_node;
     bool has_left = (child_pos > 0);
     bool has_right = (child_pos < parent_node.size);
 
@@ -505,7 +503,7 @@ void bpt<Key, Value>::merge_node(int node_index) {
             left_node.size--;
 
             //更新借来的孩子的父亲指针
-            Node<Key, Value> child_node;
+            Node<Key, Value, N> child_node;
             mr.read(child_node, node.children[0]);
             child_node.parent = node_index;
             mr.update(child_node, node.children[0]);
@@ -534,7 +532,7 @@ void bpt<Key, Value>::merge_node(int node_index) {
             right_node.size--;
 
             //更新借来的孩子的父亲指针
-            Node<Key, Value> child_node;
+            Node<Key, Value, N> child_node;
             mr.read(child_node, node.children[node.size]);
             child_node.parent = node_index;
             mr.update(child_node, node.children[node.size]);
@@ -555,7 +553,7 @@ void bpt<Key, Value>::merge_node(int node_index) {
             left_node.size += node.size;
             left_node.right = node.right;
             if(node.right != -1) {
-                Node<Key, Value> next_node;
+                Node<Key, Value, N> next_node;
                 mr.read(next_node, node.right);
                 next_node.left = left_index;
                 mr.update(next_node, node.right);
@@ -568,7 +566,7 @@ void bpt<Key, Value>::merge_node(int node_index) {
             for(int i = 0; i <= node.size; i++) {
                 left_node.children[left_node.size + 1 + i] = node.children[i];
                 if(node.children[i] != -1) {
-                    Node<Key, Value> child_node;
+                    Node<Key, Value, N> child_node;
                     mr.read(child_node, node.children[i]);
                     child_node.parent = left_index;
                     mr.update(child_node, node.children[i]);
@@ -603,7 +601,7 @@ void bpt<Key, Value>::merge_node(int node_index) {
             node.size += right_node.size;
             node.right = right_node.right;
             if(right_node.right != -1) {
-                Node<Key, Value> next_node;
+                Node<Key, Value, N> next_node;
                 mr.read(next_node, right_node.right);
                 next_node.left = node_index;
                 mr.update(next_node, right_node.right);
@@ -616,7 +614,7 @@ void bpt<Key, Value>::merge_node(int node_index) {
             for(int i = 0; i <= right_node.size; i++) {
                 node.children[node.size + 1 + i] = right_node.children[i];
                 if(right_node.children[i] != -1) {
-                    Node<Key, Value> child_node;
+                    Node<Key, Value, N> child_node;
                     mr.read(child_node, right_node.children[i]);
                     child_node.parent = node_index;
                     mr.update(child_node, right_node.children[i]);
@@ -642,13 +640,13 @@ void bpt<Key, Value>::merge_node(int node_index) {
     }
 }
 
-template<class Key, class Value>
-void bpt<Key, Value>::remove(const Key& key, const Value& value){
-    Data<Key, Value> data = Data<Key, Value>(key, value);
+template<class Key, class Value, int N>
+void bpt<Key, Value, N>::remove(const Key& key, const Value& value){
+    Data<Key, Value, N> data = Data<Key, Value, N>(key, value);
     int node_index = find_(key, value);
     if(node_index == -1) return;
 
-    Node<Key, Value> node;
+    Node<Key, Value, N> node;
     mr.read(node, node_index);
     int id = find_in_Node(node, data);
 
@@ -662,10 +660,10 @@ void bpt<Key, Value>::remove(const Key& key, const Value& value){
     if(id == 0 && node.parent != -1 && node.size > 0) {
         int curr = node_index;
         while(curr != -1) {
-            Node<Key, Value> curr_node;
+            Node<Key, Value, N> curr_node;
             mr.read(curr_node, curr);
             if(curr_node.parent == -1) break;
-            Node<Key, Value> parent_node;
+            Node<Key, Value, N> parent_node;
             mr.read(parent_node, curr_node.parent);
             int child_pos = -1;
             for(int i = 0; i <= parent_node.size; i++) {

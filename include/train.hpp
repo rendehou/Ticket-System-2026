@@ -90,10 +90,10 @@ namespace sjtu{
 
     class Trains{
     private:
-        bpt<StationStr, StationEntry> stationIdx{"station_idx"};
+        bpt<StationStr, StationEntry, 100> stationIdx{"station_idx"};
     public:
-        bpt<TrainIDStr, Train> trainpool{"trainpool"};
-        bpt<TicketKey, int> ticketPool{"ticket_pool"};  // 独立票池
+        bpt<TrainIDStr, Train, 20> trainpool{"trainpool"};
+        bpt<TicketKey, int, 400> ticketPool{"ticket_pool"};  // 独立票池
 
         // 预计算前缀和
         void pre(Train& t) {
@@ -448,7 +448,7 @@ namespace sjtu{
             int m = std::stoi(r.data[15].substr(0,2));
             int d = std::stoi(r.data[15].substr(3,2));
 
-            // 日期不在运营范围内 (6-8月)
+            //日期不在运营范围内
             if (m < 6 || m > 8) {
                 std::cout << "0" << std::endl;
                 return;
@@ -501,7 +501,7 @@ namespace sjtu{
                                     int Origin2 = (need + 1439) / 1440;
                                     if (Origin2 < 0) Origin2 = 0;
 
-                                    // 若 Origin2 早于销售期，从销售首日开始
+                                    //若Origin2早于销售期，从销售首日开始
                                     if (Origin2 < t2.saleBeginIdx) Origin2 = t2.saleBeginIdx;
 
                                     if (Origin2 >= t2.saleBeginIdx && Origin2 <= t2.saleEndIdx) {

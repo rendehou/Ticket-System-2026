@@ -58,7 +58,7 @@ namespace sjtu{
     class TicketSystem {
     private:
         
-        bpt<UsernameStr, Order> orderPool{"order_pool"};
+        bpt<UsernameStr, Order, 100> orderPool{"order_pool"};
 
         bpt<PendingKey, PendingEntry> pendingPool{"pending_pool"};
 
@@ -95,6 +95,8 @@ namespace sjtu{
             int startMin = time_to_min(t.startHour, t.startMin);
             int Origin = date - (startMin + t.depart[fromIdx]) / 1440;
             if (Origin < t.saleBeginIdx || Origin > t.saleEndIdx) return "-1";
+            // 购票数不能超过总座位数
+            if (num > t.seatNum) return "-1";
             int unitPrice = t.cum_price[toIdx] - t.cum_price[fromIdx];
             int totalPrice = unitPrice * num;
 
@@ -249,7 +251,7 @@ namespace sjtu{
                 std::cout << "-1" << std::endl;
                 return;
             }
-            // 只有 success 订单才释放座位（pending 从未扣过票）
+            //success订单才释放座位
             if (target.status == 0) {
                 for (int i = target.fromIdx; i < target.toIdx; i++) {
                     TicketKey tk;
@@ -265,7 +267,7 @@ namespace sjtu{
             orderPool.remove(username, target);
             orderPool.insert(username, refunded);
 
-            // 如果是 pending 订单，从候补队列中删除
+            //如果是pending订单，从候补队列中删除
             if (target.status == 1) {
                 PendingKey pk;
                 pk.trainID = target.trainID;
@@ -278,7 +280,7 @@ namespace sjtu{
                 pe.num = target.num;
                 pendingPool.remove(pk, pe);
             } else {
-                // 只有 release 了座位才处理候补队列
+                //只有release了座位才处理候补队列
                 process_pending(ts, target.trainID, target.dateDay);
             }
 
@@ -300,7 +302,7 @@ namespace sjtu{
             auto pendingList = pendingPool.find_all(key);
             if (pendingList.empty()) return;
 
-            // 按时间戳插入排序（优先级：时间戳小的先满足）
+            //按时间戳插入排序
             for (int a = 1; a < pendingList.size(); ++a) {
                 PendingEntry key = pendingList[a];
                 int b = a - 1;
@@ -354,7 +356,6 @@ namespace sjtu{
                     }
                 }
             }
-            // 不需要 remove+insert trainpool，ticket 已独立存储
         }
     };
 };
