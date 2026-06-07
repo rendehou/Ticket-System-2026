@@ -105,7 +105,7 @@ inline bool valid_date(const std::string& s) {
     if (!is_digit(s[3]) || !is_digit(s[4])) return false;
     int mm = (s[0]-'0')*10 + (s[1]-'0');
     int dd = (s[3]-'0')*10 + (s[4]-'0');
-    if (mm < 6 || mm > 8) return false;
+    if (mm < 1 || mm > 12) return false;
     if (dd < 1 || dd > 31) return false;
     return true;
 }

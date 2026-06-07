@@ -9,7 +9,7 @@
 #include "user.hpp"
 
 namespace sjtu{
-    // 候补队列 Key: (车次, 始发日期)
+    //候补队列二元组，火车名和日期
     struct PendingKey {
         TrainIDStr trainID;
         int dateDay;
@@ -38,6 +38,9 @@ namespace sjtu{
         bool operator<(const Order& o) const {
             return timestamp < o.timestamp;
         }
+        bool operator==(const Order& o) const {
+            return timestamp == o.timestamp && status == o.status;
+        }
     };
     struct PendingEntry {//后补类
         int timestamp; 
@@ -48,6 +51,9 @@ namespace sjtu{
         bool operator<(const PendingEntry& o) const {
             return timestamp < o.timestamp;
         }
+        bool operator==(const PendingEntry& o) const {
+            return timestamp == o.timestamp;
+        }
     };
     class TicketSystem {
     private:
@@ -57,12 +63,274 @@ namespace sjtu{
         bpt<PendingKey, PendingEntry> pendingPool{"pending_pool"};
 
     public: 
-        std::string buy_ticket(const result& r, Trains& ts, users& us);
-        void query_order(const result& r, users& us, Trains& ts);
-        void refund_ticket(const result& r, Trains& ts, users& us);
+
+        std::string buy_ticket(const result& r, Trains& ts, users& us) {
+
+            UsernameStr username(r.data[2].c_str());
+            TrainIDStr trainID(r.data[7].c_str());
+            StationStr fromSta(r.data[18].c_str());
+            StationStr toSta(r.data[19].c_str());
+            int num = std::stoi(r.data[17]);
+            int m = std::stoi(r.data[15].substr(0, 2));
+            int d = std::stoi(r.data[15].substr(3, 2));
+            int date = date_to_day(m, d);
+            bool flag = (r.data[20] == "true");
+
+            //检查购票者和车次是否存在
+            if (!us.is_online(username)) return "-1";
+            auto tv = ts.trainpool.find_all(trainID);
+            if (tv.empty()) return "-1";
+            Train t = tv[0];
+            if (!t.released) return "-1";
+
+            //检查车次信息
+            int fromIdx = -1, toIdx = -1;
+            for (int i = 0; i < t.stationNum; i++) {
+                if (t.stations[i] == fromSta) fromIdx = i;
+                if (t.stations[i] == toSta)   toIdx   = i;
+            }
+            if (fromIdx == -1 || toIdx == -1 || fromIdx >= toIdx) return "-1";
+
+            //计算时间和票价
+            int startMin = time_to_min(t.startHour, t.startMin);
+            int Origin = date - (startMin + t.depart[fromIdx]) / 1440;
+            if (Origin < t.saleBeginIdx || Origin > t.saleEndIdx) return "-1";
+            int unitPrice = t.cum_price[toIdx] - t.cum_price[fromIdx];
+            int totalPrice = unitPrice * num;
+
+            bool enough = true;
+            for (int i = fromIdx; i < toIdx; i++) {
+                TicketKey tk;
+                tk.trainID = trainID; tk.day = Origin; tk.seg = i;
+                auto sv = ts.ticketPool.find_all(tk);
+                if (sv.empty() || sv[0] < num) {
+                    enough = false;
+                    break;
+                }
+            }
+
+            if (enough) {
+                for (int i = fromIdx; i < toIdx; i++) {
+                    TicketKey tk;
+                    tk.trainID = trainID; tk.day = Origin; tk.seg = i;
+                    auto sv = ts.ticketPool.find_all(tk);
+                    int newSeat = sv[0] - num;
+                    ts.ticketPool.remove(tk, sv[0]);
+                    ts.ticketPool.insert(tk, newSeat);
+                }
+
+                Order o;
+                o.status = 0;
+                o.trainID  = trainID;
+                o.fromStation = fromSta;
+                o.toStation = toSta;
+                o.fromIdx = fromIdx;
+                o.toIdx = toIdx;
+                o.dateDay = Origin;
+                o.num = num;
+                o.price = totalPrice;
+                o.timestamp = r.timestamp_;
+
+                orderPool.insert(username, o);//插入购票记录
+                return std::to_string(totalPrice);
+            }
+
+            if (flag) {//可以进入队列后补
+                Order o;
+                o.status = 1;
+                o.trainID = trainID;
+                o.fromStation = fromSta;
+                o.toStation = toSta;
+                o.fromIdx = fromIdx;
+                o.toIdx = toIdx;
+                o.dateDay = Origin;
+                o.num = num;
+                o.price = totalPrice;
+                o.timestamp = r.timestamp_;
+
+                orderPool.insert(username, o);
+
+                PendingEntry pe;
+                pe.timestamp = r.timestamp_;
+                pe.username = username;
+                pe.fromIdx = fromIdx;
+                pe.toIdx = toIdx;
+                pe.num = num;
+                PendingKey key;
+                key.trainID = trainID;
+                key.dateDay = Origin;
+
+                pendingPool.insert(key, pe);
+                return "queue";
+            }
+
+            return "-1";
+        }
+
+        /*
+        返回值: 第一行订单数量, 后续每行 [STATUS] trainID FROM LEAVING -> TO ARRIVING PRICE NUM
+        失败: -1
+        */
+        void query_order(const result& r, users& us, Trains& ts) {
+            UsernameStr username(r.data[2].c_str());
+
+            //检查登录
+            if (!us.is_online(username)) {
+                std::cout << "-1" << std::endl;
+                return;
+            }
+
+            auto orders = orderPool.find_all(username);
+
+            //输出
+            std::cout << orders.size() << std::endl;
+            for (int i = orders.size() - 1; i >= 0; i--) {
+                Order& o = orders[i];
+
+
+                const char* statusStr;
+                if (o.status == 0) statusStr = "success";
+                else if (o.status == 1) statusStr = "pending";
+                else statusStr = "refunded";
+
+                auto tv = ts.trainpool.find_all(o.trainID);
+                if (tv.empty()) continue;
+                Train& t = tv[0];
+                int startMin = time_to_min(t.startHour, t.startMin);
+
+                int departAbs = o.dateDay * 1440 + startMin + t.depart[o.fromIdx];
+                int arriveAbs = o.dateDay * 1440 + startMin + t.arrive[o.toIdx];
+                std::cout << "[" << statusStr << "] "
+                          << o.trainID << " "
+                          << o.fromStation << " "
+                          << abs_to_str(departAbs) << " -> "
+                          << o.toStation << " "
+                          << abs_to_str(arriveAbs) << " "
+                          << o.price / o.num << " "
+                          << o.num << std::endl;
+            }
+        }
+
+        /*
+        返回值: 退票成功 0, 失败 -1
+        */
+        void refund_ticket(const result& r, Trains& ts, users& us) {
+            UsernameStr username(r.data[2].c_str());
+
+            //检查登录
+            if (!us.is_online(username)) {
+                std::cout << "-1" << std::endl;
+                return;
+            }
+
+            int n = 1;
+            if (!r.data[22].empty()) n = std::stoi(r.data[22]);
+            auto orders = orderPool.find_all(username);
+
+            //倒序找n个未退票的订单
+            int count = 0;
+            int targetIdx = -1;
+            for (int i = orders.size() - 1; i >= 0; i--) {
+                if (orders[i].status != 2) {//跳过已退票的
+                    count++;
+                    if (count == n) {
+                        targetIdx = i;
+                        break;
+                    }
+                }
+            }
+
+            if (targetIdx == -1 || orders[targetIdx].status != 0) {
+                std::cout << "-1" << std::endl;
+                return;
+            }
+
+            Order target = orders[targetIdx];
+
+            //对火车释放座位
+            auto tv = ts.trainpool.find_all(target.trainID);
+            if (tv.empty()) {
+                std::cout << "-1" << std::endl;
+                return;
+            }
+            for (int i = target.fromIdx; i < target.toIdx; i++) {
+                TicketKey tk;
+                tk.trainID = target.trainID; tk.day = target.dateDay; tk.seg = i;
+                auto sv = ts.ticketPool.find_all(tk);
+                int newSeat = sv[0] + target.num;
+                ts.ticketPool.remove(tk, sv[0]);
+                ts.ticketPool.insert(tk, newSeat);
+            }
+            Order refunded = target;
+            refunded.status = 2;
+            orderPool.remove(username, target);
+            orderPool.insert(username, refunded);
+            //处理候补队列
+            process_pending(ts, target.trainID, target.dateDay);
+
+            std::cout << "0" << std::endl;
+        }
 
     private:
-        void process_pending(Trains& ts, const TrainIDStr& tid, int dateDay, Train& t);
+        /*
+        退票后处理候补队列:
+        遍历 (trainID, dateDay) 的候补列表, 按下单时间顺序尝试满足
+        能完全满足的就兑现 (改订单状态 + 扣票 + 删除候补)
+        不能满足的跳过, 继续下一个
+        */
+        void process_pending(Trains& ts, const TrainIDStr& tid, int dateDay) {
+            PendingKey key;
+            key.trainID = tid;
+            key.dateDay = dateDay;
+
+            auto pendingList = pendingPool.find_all(key);
+            if (pendingList.empty()) return;
+
+            //加载车次
+            auto tv = ts.trainpool.find_all(tid);
+            if (tv.empty()) return;
+            for (int idx = 0; idx < pendingList.size(); idx++) {
+                PendingEntry& pe = pendingList[idx];
+
+                //检查余票是否足够
+                bool enough = true;
+                for (int i = pe.fromIdx; i < pe.toIdx; i++) {
+                    TicketKey tk;
+                    tk.trainID = tid; tk.day = dateDay; tk.seg = i;
+                    auto sv = ts.ticketPool.find_all(tk);
+                    if (sv.empty() || sv[0] < pe.num) {
+                        enough = false;
+                        break;
+                    }
+                }
+                if (!enough) continue;
+                for (int i = pe.fromIdx; i < pe.toIdx; i++) {
+                    TicketKey tk;
+                    tk.trainID = tid; tk.day = dateDay; tk.seg = i;
+                    auto sv = ts.ticketPool.find_all(tk);
+                    int newSeat = sv[0] - pe.num;
+                    ts.ticketPool.remove(tk, sv[0]);
+                    ts.ticketPool.insert(tk, newSeat);
+                }
+
+                // 从候补队列删除
+                pendingPool.remove(key, pe);
+
+                //更新订单状态
+                auto userOrders = orderPool.find_all(pe.username);
+                for (int j = 0; j < userOrders.size(); j++) {
+                    if (userOrders[j].timestamp == pe.timestamp
+                        && userOrders[j].status == 1) {
+                        Order full = userOrders[j];
+                        full.status = 0;
+                        orderPool.remove(pe.username, userOrders[j]);
+                        orderPool.insert(pe.username, full);
+                        break;
+                    }
+                }
+            }
+            // 不需要 remove+insert trainpool，ticket 已独立存储
+        }
     };
 };
 

@@ -124,7 +124,7 @@ namespace sjtu{
 
             auto v = userpool.find_all(username);
             if(v.empty()) return "-1";
-            if(p < v[0].pri() && current_username != username) return "-1";
+            if(p <= v[0].pri() && current_username != username) return "-1";
 
             //拼接输出
             std::string information;
@@ -149,7 +149,7 @@ namespace sjtu{
             int p = online_user[current_username];
             auto v = userpool.find_all(username);
             if(v.empty()) return "-1";
-            if(p < v[0].pri() && current_username != username) return "-1";
+            if(p <= v[0].pri() && current_username != username) return "-1";
 
             //读出原用户
             PasswordStr new_pw  = r.data[3].empty() ? v[0].password() : PasswordStr(r.data[3].c_str());
@@ -157,7 +157,7 @@ namespace sjtu{
             MailStr new_mail= r.data[5].empty() ? v[0].mail_() : MailStr(r.data[5].c_str());
             int new_g = r.data[6].empty() ? v[0].pri() : std::stoi(r.data[6]);
 
-            if(p < new_g) return "-1";
+            if(p <= new_g) return "-1";
             User u(username,new_pw,new_mail,new_g,new_nm);
             //写入修改后的用户到数据库
             userpool.remove(v[0].username(), v[0]);
