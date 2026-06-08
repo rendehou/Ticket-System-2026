@@ -164,8 +164,8 @@ namespace sjtu{
             pre(t);
 
             // 车次已存在则失败
-            auto v = trainpool.find_all(t.TrainID);
-            if (!v.empty()) return false;
+            Train _tmp;
+            if (trainpool.find_value(t.TrainID, _tmp)) return false;
 
             //写入车次数据与站名索引
             trainpool.insert(t.TrainID, t);
@@ -182,10 +182,9 @@ namespace sjtu{
         */
         bool delete_train(const result& r) {
             TrainIDStr id(r.data[7].c_str());  
-            auto v = trainpool.find_all(id);
-            if (v.empty()) return false;  
-            if (v[0].released) return false; 
-            Train& t = v[0];
+            Train t;
+            if (!trainpool.find_value(id, t)) return false;  
+            if (t.released) return false; 
 
             //从站名索引和车次池中移除该车次所有站名
             for (int i = 0; i < t.stationNum; ++i) {
@@ -205,11 +204,11 @@ namespace sjtu{
         bool release_train(const result& r) {
             TrainIDStr id(r.data[7].c_str());
 
-            auto v = trainpool.find_all(id);
-            if (v.empty()) return false;    
-            if (v[0].released) return false;  
+            Train t;
+            if (!trainpool.find_value(id, t)) return false;    
+            if (t.released) return false;  
 
-            Train t = v[0];
+            Train old_t = t; // 保存原值用于 remove
             t.released = true;
 
             // 发布时初始化ticket每天一个 TicketDay类票
@@ -225,7 +224,7 @@ namespace sjtu{
             }
 
             //更新车次数据
-            trainpool.remove(id, v[0]);
+            trainpool.remove(id, old_t);
             trainpool.insert(id, t);
             return true;
         }
@@ -253,13 +252,11 @@ namespace sjtu{
                 return;
             }
 
-            auto v = trainpool.find_all(id);
-            if (v.empty()) {
+            Train t;
+            if (!trainpool.find_value(id, t)) {
                 std::cout << "-1" << std::endl;
                 return;
             }
-
-            Train& t = v[0];
             int base_day = date_to_day(m, d);
 
             // 日期不在该车次销售区间内
@@ -272,7 +269,8 @@ namespace sjtu{
 
             // 一次查询拿当天所有段票数
             TicketKey tkey; tkey.trainID = id; tkey.day = base_day;
-            auto tdVec = ticketPool.find_all(tkey);
+            TicketDay td;
+            bool has_td = ticketPool.find_value(tkey, td);
 
             std::cout << t.TrainID << " " << t.type << std::endl;
 
@@ -299,7 +297,7 @@ namespace sjtu{
                     seat_str = std::to_string(t.seatNum);
                 }
                 else {
-                    seat_str = tdVec.empty() ? std::to_string(t.seatNum) : std::to_string(tdVec[0].seats[i]);
+                    seat_str = has_td ? std::to_string(td.seats[i]) : std::to_string(t.seatNum);
                 }
                 std::cout << t.stations[i] << " " << arr_str << " -> " << dep_str << " " << t.cum_price[i] << " " << seat_str << std::endl;
             }
@@ -311,6 +309,8 @@ namespace sjtu{
             int price;  
             int time;
             int seat;
+            StationStr fromStation, toStation;
+            int depart_time, arrive_time;
             bool operator<(const TicketCandidate& o) const {
                 if (time != o.time) return time < o.time;
                 return trainID < o.trainID;
@@ -318,11 +318,11 @@ namespace sjtu{
         };
         int get_ticket(const TrainIDStr& trainID, int date, int dep_station, int des_station) {
             TicketKey tk; tk.trainID = trainID; tk.day = date;
-            auto v = ticketPool.find_all(tk);
-            if (v.empty()) return 0;
+            TicketDay td;
+            if (!ticketPool.find_value(tk, td)) return 0;
             int min = 1e9;
             for (int i = dep_station; i < des_station; i++) {
-                if (v[0].seats[i] < min) min = v[0].seats[i];
+                if (td.seats[i] < min) min = td.seats[i];
             }
             return min;
         }
@@ -354,9 +354,8 @@ namespace sjtu{
             std::string keyword = r.data[21];
             bool sortByTime = (keyword.empty() || keyword == "time");
             
-            sjtu::vector<StationEntry> v_departure,v_destination;
-            v_departure = stationIdx.find_all(departure);
-            v_destination = stationIdx.find_all(destination);
+            sjtu::vector<StationEntry> v_departure; v_departure = stationIdx.find_all(departure);
+            sjtu::vector<StationEntry> v_destination; v_destination = stationIdx.find_all(destination);
             
             sjtu::vector<TicketCandidate> candidates;//所有的待选车
 
@@ -368,8 +367,8 @@ namespace sjtu{
                     int dep_id = v_departure[i].stationIndex;
                     int dest_id = v_destination[j].stationIndex;
                     if(dep_id < dest_id){
-                        auto tv = trainpool.find_all(v_departure[i].trainID);
-                        Train& t = tv[0];
+                        Train t;
+                        if (!trainpool.find_value(v_departure[i].trainID, t)) continue;
 
                         if(t.released) {
                             int start_min = time_to_min(t.startHour,t.startMin);
@@ -385,6 +384,10 @@ namespace sjtu{
                                     c.price = t.cum_price[dest_id] - t.cum_price[dep_id];
                                     c.time = t.arrive[dest_id] - t.depart[dep_id];
                                     c.seat = remain;
+                                    c.fromStation = t.stations[dep_id];
+                                    c.toStation = t.stations[dest_id];
+                                    c.depart_time = Origin * 1440 + start_min + t.depart[dep_id];
+                                    c.arrive_time = Origin * 1440 + start_min + t.arrive[dest_id];
                                     candidates.push_back(c);
                                 }
                             }
@@ -422,21 +425,13 @@ namespace sjtu{
 
             for (int a = 0; a < candidates.size(); ++a) {
                 TicketCandidate& c = candidates[a];
-                auto tv = trainpool.find_all(c.trainID);
-                Train& t = tv[0];
-
-                int start_min = time_to_min(t.startHour,t.startMin);
-                int Origin = date - (start_min + t.depart[c.fromIdx]) / 1440;
-
-                int depart_time = Origin * 1440 + start_min + t.depart[c.fromIdx];
-                int arrive_time = Origin * 1440 + start_min + t.arrive[c.toIdx];
 
                 std::cout
-                    << t.TrainID << " "
-                    << t.stations[c.fromIdx] << " "
-                    << abs_to_str(depart_time) << " -> "
-                    << t.stations[c.toIdx] << " "
-                    << abs_to_str(arrive_time) << " "
+                    << c.trainID << " "
+                    << c.fromStation << " "
+                    << abs_to_str(c.depart_time) << " -> "
+                    << c.toStation << " "
+                    << abs_to_str(c.arrive_time) << " "
                     << c.price << " "
                     << c.seat << std::endl;
             }
@@ -468,10 +463,8 @@ namespace sjtu{
             transfer_result best;
             bool valid = 0;
 
-            sjtu::vector<StationEntry> v_departure;
-            sjtu::vector<StationEntry> v_destination;
-            v_departure = stationIdx.find_all(from);
-            v_destination = stationIdx.find_all(to);
+            sjtu::vector<StationEntry> v_departure; v_departure = stationIdx.find_all(from);
+            sjtu::vector<StationEntry> v_destination; v_destination = stationIdx.find_all(to);
 
             for(int i = 0;i < v_departure.size();i++){
                 TrainIDStr tid1 = v_departure[i].trainID;

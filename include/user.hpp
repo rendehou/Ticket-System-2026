@@ -74,8 +74,8 @@ namespace sjtu{
                 userpool.insert(first_user.username(), first_user);
                 return 1;
             }
-            auto v = userpool.find_all(u.username());
-            if(!v.empty() || online_user.find(current_username) == online_user.end()) return 0;
+            User _tmp;
+            if(userpool.find_value(u.username(), _tmp) || online_user.find(current_username) == online_user.end()) return 0;
             if(online_user[current_username] <= u.pri()) return 0;
             userpool.insert(u.username(), u);
             return 1;
@@ -90,10 +90,10 @@ namespace sjtu{
             */
             UsernameStr username(r.data[2].c_str());
             PasswordStr password(r.data[3].c_str());
-            auto v = userpool.find_all(username);
-            if(v.empty() || v[0].password() != password) return 0;
+            User u;
+            if(!userpool.find_value(username, u) || u.password() != password) return 0;
             if(online_user.find(username) != online_user.end()) return 0;
-            online_user.insert({username, v[0].pri()});
+            online_user.insert({username, u.pri()});
             return 1;
         }
         bool logout(const result& r){
@@ -122,16 +122,16 @@ namespace sjtu{
             if(online_user.find(current_username) == online_user.end()) return "-1";
             int p = online_user[current_username];
 
-            auto v = userpool.find_all(username);
-            if(v.empty()) return "-1";
-            if(p <= v[0].pri() && current_username != username) return "-1";
+            User u;
+            if(!userpool.find_value(username, u)) return "-1";
+            if(p <= u.pri() && current_username != username) return "-1";
 
             //拼接输出
             std::string information;
-            information += v[0].username().to_string() + " ";
-            information += v[0].chinesename().to_string() + " ";
-            information += v[0].mail_().to_string() + " "; 
-            information += std::to_string(v[0].pri());
+            information += u.username().to_string() + " ";
+            information += u.chinesename().to_string() + " ";
+            information += u.mail_().to_string() + " "; 
+            information += std::to_string(u.pri());
             return information;
         }
         std::string modify_profile(const result& r) {
@@ -147,21 +147,21 @@ namespace sjtu{
             UsernameStr username(r.data[2].c_str());
             if(online_user.find(current_username) == online_user.end()) return "-1";
             int p = online_user[current_username];
-            auto v = userpool.find_all(username);
-            if(v.empty()) return "-1";
-            if(p <= v[0].pri() && current_username != username) return "-1";
+            User old_u;
+            if(!userpool.find_value(username, old_u)) return "-1";
+            if(p <= old_u.pri() && current_username != username) return "-1";
 
             //读出原用户
-            PasswordStr new_pw  = r.data[3].empty() ? v[0].password() : PasswordStr(r.data[3].c_str());
-            NameStr new_nm  = r.data[4].empty() ? v[0].chinesename() : NameStr(r.data[4].c_str());
-            MailStr new_mail= r.data[5].empty() ? v[0].mail_() : MailStr(r.data[5].c_str());
-            int new_g = r.data[6].empty() ? v[0].pri() : std::stoi(r.data[6]);
+            PasswordStr new_pw  = r.data[3].empty() ? old_u.password() : PasswordStr(r.data[3].c_str());
+            NameStr new_nm  = r.data[4].empty() ? old_u.chinesename() : NameStr(r.data[4].c_str());
+            MailStr new_mail= r.data[5].empty() ? old_u.mail_() : MailStr(r.data[5].c_str());
+            int new_g = r.data[6].empty() ? old_u.pri() : std::stoi(r.data[6]);
 
             // -g 如果提供，必须低于 -c 的权限
             if (!r.data[6].empty() && new_g >= p) return "-1";
             User u(username,new_pw,new_mail,new_g,new_nm);
             //写入修改后的用户到数据库
-            userpool.remove(v[0].username(), v[0]);
+            userpool.remove(old_u.username(), old_u);
             userpool.insert(u.username(), u);
             //如果被修改用户在线，更新在线列表中的权限
             if(online_user.find(u.username()) != online_user.end()) {

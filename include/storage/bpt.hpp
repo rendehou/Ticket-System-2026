@@ -14,68 +14,108 @@ using std::ofstream;
 template<class T, int info_len = 2>
 class MemoryRiver {
 private:
-    FILE* fp;
+    /* your code here */
+    fstream file;
     string file_name;
     int sizeofT = sizeof(T);
-    char buf[1<<20]; // 1MB buffer
+    void ensure_open() {
+        if (!file.is_open()) file.open(file_name,std::ios::in|std::ios::out|std::ios::binary);
+    }
 public:
-    MemoryRiver() : fp(nullptr) {}
-    MemoryRiver(const string& file_name) : file_name(file_name), fp(nullptr) {}
-    ~MemoryRiver() { if (fp) fclose(fp); }
+    MemoryRiver() = default;
+
+    MemoryRiver(const string& file_name) : file_name(file_name) {}
+
+    ~MemoryRiver() {
+        if (file.is_open()) file.close();
+    }
 
     void initialise(string FN = "") {
         if (FN != "") file_name = FN;
-        if (fp) { fclose(fp); fp = nullptr; }
+        if (file.is_open()) file.close();
         bool exists = false;
         if (!file_name.empty()) {
-            FILE* probe = fopen(file_name.c_str(), "rb");
-            if (probe) { exists = true; fclose(probe); }
+            ifstream probe(file_name, std::ios::binary);
+            exists = probe.good();
         }
         if (!exists) {
-            fp = fopen(file_name.c_str(), "wb+");
+            file.open(file_name, std::ios::out|std::ios::binary|std::ios::trunc);
             int tmp = 0;
-            for (int i = 0; i < info_len; ++i) fwrite(&tmp, sizeof(int), 1, fp);
-            fclose(fp);
+            for (int i = 0; i < info_len; ++i)
+                file.write(reinterpret_cast<char *>(&tmp), sizeof(int));
+            file.close();
         }
-        fp = fopen(file_name.c_str(), "r+b");
-        setvbuf(fp, buf, _IOFBF, sizeof(buf));
+        file.open(file_name, std::ios::in|std::ios::out|std::ios::binary);
     }
 
+    //读出第n个int的值赋给tmp，1_base
     void get_info(int &tmp, int n) {
-        if (n > info_len || !fp) return;
-        fseek(fp, (n-1)*sizeof(int), SEEK_SET);
-        fread(&tmp, sizeof(int), 1, fp);
+        if (n > info_len) return;
+        ensure_open();
+        if(!file.is_open()) return;
+        file.clear();
+        file.seekg((n-1)*sizeof(int));
+        file.read(reinterpret_cast<char *>(&tmp), sizeof(int));
+        /* your code here */
     }
+
+    //将tmp写入第n个int的位置，1_base
     void write_info(int tmp, int n) {
-        if (n > info_len || !fp) return;
-        fseek(fp, (n-1)*sizeof(int), SEEK_SET);
-        fwrite(&tmp, sizeof(int), 1, fp);
+        if (n > info_len) return;
+        ensure_open();
+        if(!file.is_open()) return;
+        file.clear();
+        file.seekp((n-1)*sizeof(int));//注意一会来查一下这里是n还是n-1
+        file.write(reinterpret_cast<char *>(&tmp),sizeof(int));
+        /* your code here */
     }
+
+    //在文件合适位置写入类对象t，并返回写入的位置索引index
+    //位置索引意味着当输入正确的位置索引index，在以下三个函数中都能顺利的找到目标对象进行操作
+    //位置索引index可以取为对象写入的起始位置
     int write(T &t) {
-        if (!fp) return 0;
-        fseek(fp, 0, SEEK_END);
-        int index = ftell(fp);
-        fwrite(&t, sizeofT, 1, fp);
+        ensure_open();
+        if(!file.is_open()) return 0;
+        file.clear();
+        file.seekp(0,std::ios::end);
+        int index = file.tellp();
+        file.write(reinterpret_cast<char *>(&t),sizeofT);
         return index;
+        /* your code here */
     }
+
+    //用t的值更新位置索引index对应的对象，保证调用的index都是由write函数产生
     void update(T &t, const int index) {
-        if (!fp) return;
-        fseek(fp, index, SEEK_SET);
-        fwrite(&t, sizeofT, 1, fp);
+        ensure_open();
+        if(!file.is_open()) return;
+        file.clear();
+        file.seekp(index);
+        file.write(reinterpret_cast<char *>(&t),sizeofT);
+        /* your code here */
     }
+
+    //读出位置索引index对应的T对象的值并赋值给t，保证调用的index都是由write函数产生
     void read(T &t, const int index) {
-        if (!fp) return;
-        fseek(fp, index, SEEK_SET);
-        fread(&t, sizeofT, 1, fp);
+        ensure_open();
+        if(!file.is_open()) return;
+        file.clear();
+        file.seekg(index);
+        file.read(reinterpret_cast<char *>(&t),sizeofT);
+        /* your code here */
     }
-    void Delete(int index) {}
+
+    //删除位置索引index对应的对象(不涉及空间回收时，可忽略此函数)，保证调用的index都是由write函数产生
+    void Delete(int index) {
+        
+        /* your code here */
+    }
 };
 
 template<class Key, class Value, int N = 50>
 struct Data {//存储键值对
     Key key;
     Value value;
-    Data() {}
+    Data() = default;
     Data(const Key& k) : key(k) {}
     Data(const Key& k, const Value& v) : key(k), value(v) {}
     Data &operator=(const Data& other) {
@@ -104,15 +144,16 @@ struct Data {//存储键值对
 
 template<class Key, class Value, int N = 50>
 struct Node {//树的节点
-    bool is_leaf = 0;//是否为叶子节点
-    Data<Key, Value, N> data[N+1];
-    //多给一个的空间，这样在插入时就不需要考虑满了之后的情况了，直接插入，等插入完了再分裂，实际上每个节点范围为N/2到N
-    int size = 0;//存了多少了,这里指的是标记
+    bool is_leaf = 0;
+    int size = 0;
     int parent = -1;
-    int children[N+2];//注意如果是叶节点就没有这些
-    int right = -1;//右兄弟
-    int left = -1;//左兄弟
-    Node() = default;
+    int children[N+2];
+    int right = -1;
+    int left = -1;
+    // 原始字节存储，避免默认构造清零
+    alignas(Data<Key, Value, N>) char raw[(N+1) * sizeof(Data<Key, Value, N>)];
+    Data<Key, Value, N>& d(int i) { return reinterpret_cast<Data<Key, Value, N>&>(raw[i * sizeof(Data<Key, Value, N>)]); }
+    const Data<Key, Value, N>& d(int i) const { return reinterpret_cast<const Data<Key, Value, N>&>(raw[i * sizeof(Data<Key, Value, N>)]); }
 };
 
 template<class Key, class Value, int N = 50>
@@ -145,8 +186,8 @@ int find_in_Node(const Node<Key, Value, N>& node, const Data<Key, Value, N> data
     int l = 0, r = node.size - 1;
     while (l <= r) {
         int mid = (l + r) / 2;
-        if (node.data[mid] < data_) l = mid + 1;
-        else if (node.data[mid] > data_) r = mid - 1;
+        if (node.d(mid) < data_) l = mid + 1;
+        else if (node.d(mid) > data_) r = mid - 1;
         else return mid;
     }
     return l;//返回node中第一个大于等于data的位置，如果没有则返回node尾部
@@ -158,7 +199,7 @@ int find_child_in_Node(const Node<Key, Value, N>& node, const Data<Key, Value, N
     int l = 0, r = node.size - 1;
     while (l <= r) {
         int mid = (l + r) / 2;
-        if (node.data[mid] <= data_) l = mid + 1;
+        if (node.d(mid) <= data_) l = mid + 1;
         else r = mid - 1;
     }
     return l;
@@ -178,7 +219,7 @@ void bpt<Key, Value, N>::split_Node(int node_index){
 
         int mid = node.size / 2;
         for(int i = mid; i < node.size; i++) {
-            new_splited_Node.data[i-mid] = node.data[i];
+            new_splited_Node.d(i-mid) = node.d(i);
         }
         new_splited_Node.size = node.size - mid;
         node.size = mid;
@@ -198,20 +239,20 @@ void bpt<Key, Value, N>::split_Node(int node_index){
             node_right.left = new_splited_Node_index;
             mr.update(node_right, new_splited_Node.right);
         }
-        up_data = new_splited_Node.data[0];
+        up_data = new_splited_Node.d(0);
 
     } else {
 
         //基本信息
         int mid = node.size / 2;
         int right_size = node.size - mid - 1;
-        up_data = node.data[mid];
+        up_data = node.d(mid);
         new_splited_Node.is_leaf = 0;
         new_splited_Node.parent = node.parent;
 
         //data和children
         for(int i = 0; i < right_size; i++) {
-            new_splited_Node.data[i] = node.data[mid + 1 + i];
+            new_splited_Node.d(i) = node.d(mid + 1 + i);
         }
         for(int i = 0; i < right_size + 1; i++) {
             new_splited_Node.children[i] = node.children[mid + 1 + i];
@@ -249,7 +290,7 @@ void bpt<Key, Value, N>::split_Node(int node_index){
         //建立新根
         Data<Key, Value, N> up_key = up_data;
         Node<Key, Value, N> new_root;//建立新根
-        new_root.data[0] = up_key;
+        new_root.d(0) = up_key;
         new_root.size = 1;
         new_root.is_leaf = 0;
         new_root.parent = -1;
@@ -272,13 +313,13 @@ void bpt<Key, Value, N>::split_Node(int node_index){
 
         //移动数据挪位置
         for(int i = parent_node.size; i > id_in_parent; i--) {
-            parent_node.data[i] = parent_node.data[i-1];
+            parent_node.d(i) = parent_node.d(i-1);
         }
         for(int i = parent_node.size + 1; i > id_in_parent + 1; i--) { //children单独右移，避免越界
             parent_node.children[i] = parent_node.children[i-1];
         }
 
-        parent_node.data[id_in_parent] = up_data;
+        parent_node.d(id_in_parent) = up_data;
         parent_node.children[id_in_parent+1] = new_splited_Node_index;
         parent_node.size++;
         new_splited_Node.parent = node.parent;//修改新分裂块的父亲指针
@@ -306,7 +347,7 @@ void bpt<Key, Value, N>::insert(const Key& key, const Value& value) {
     if(root <= 0) {
         Node<Key, Value, N> new_node;
         new_node.is_leaf = 1;//插入根,是根又是叶
-        new_node.data[0] = data;//data 0-based
+        new_node.d(0) = data;//data 0-based
         new_node.size = 1;
         root = mr.write(new_node);
         mr.write_info(root,1);
@@ -325,13 +366,13 @@ void bpt<Key, Value, N>::insert(const Key& key, const Value& value) {
 
     //跳出循环的时候已经在叶子
     int id = find_in_Node(current_Node, data);
-    if(id < current_Node.size && current_Node.data[id] == data) return;
+    if(id < current_Node.size && current_Node.d(id) == data) return;
     
     //腾出位置
     for(int i = current_Node.size; i > id; i--) {
-        current_Node.data[i] = current_Node.data[i-1];
+        current_Node.d(i) = current_Node.d(i-1);
     } 
-    current_Node.data[id] = data;
+    current_Node.d(id) = data;
     current_Node.size++;
 
     //处理块的大小
@@ -369,8 +410,8 @@ sjtu::vector<Value> bpt<Key, Value, N>::find_all(const Key& key) {
     while(true) {//这里要沿着叶节点不断循环匹配
         int id = find_in_Node(current_Node, data_l);
         for(int i = id; i < current_Node.size; i++) {//从第一个大于等于data的位置开始匹配
-            if(current_Node.data[i].key == key) {
-                result.push_back(current_Node.data[i].value);
+            if(current_Node.d(i).key == key) {
+                result.push_back(current_Node.d(i).value);
             } else { //已经不是一个关键词了，停下
                 stop = true; 
                 break; 
@@ -399,7 +440,7 @@ int bpt<Key, Value, N>::find_(const Key& key, const Value& value) {//重载find�
     }
 
     int id = find_in_Node(current_Node, data);
-    if(id < current_Node.size && current_Node.data[id] == data) return current_index;
+    if(id < current_Node.size && current_Node.d(id) == data) return current_index;
     
     return -1;
 }
@@ -407,19 +448,20 @@ int bpt<Key, Value, N>::find_(const Key& key, const Value& value) {//重载find�
 template<class Key, class Value, int N>
 bool bpt<Key, Value, N>::find_value(const Key& key, Value& out) {
     if (root <= 0) return false;
-    Data<Key, Value, N> data(key);
     int current_index = root;
     Node<Key, Value, N> current_Node;
     mr.read(current_Node, root);
     while (!current_Node.is_leaf) {
-        int id = find_child_in_Node(current_Node, data);
+        // 只比较 key 找子节点（避免值比较导致错误分支）
+        int id = 0;
+        while (id < current_Node.size && !(key < current_Node.d(id).key)) id++;
         current_index = current_Node.children[id];
         mr.read(current_Node, current_index);
     }
-    // 叶子节点线性扫描（避免二分搜索的值比较问题）
+    // 叶子节点线性扫描
     for (int i = 0; i < current_Node.size; i++) {
-        if (current_Node.data[i].key == key) {
-            out = current_Node.data[i].value;
+        if (current_Node.d(i).key == key) {
+            out = current_Node.d(i).value;
             return true;
         }
     }
@@ -467,17 +509,17 @@ void bpt<Key, Value, N>::merge_node(int node_index) {
     //尝试从左兄弟借
     if(has_left && left_node.size > N/2) {
         if(node.is_leaf) {
-            for(int i = node.size; i > 0; i--) node.data[i] = node.data[i-1];
-            node.data[0] = left_node.data[left_node.size - 1];
+            for(int i = node.size; i > 0; i--) node.d(i) = node.d(i-1);
+            node.d(0) = left_node.d(left_node.size - 1);
             node.size++;
             left_node.size--;
-            parent_node.data[child_pos - 1] = node.data[0];
+            parent_node.d(child_pos - 1) = node.d(0);
         } else {//内部节点要借一个分界值下来,然后
-            for(int i = node.size; i > 0; i--) node.data[i] = node.data[i-1];
+            for(int i = node.size; i > 0; i--) node.d(i) = node.d(i-1);
             for(int i = node.size + 1; i > 0; i--) node.children[i] = node.children[i-1];
-            node.data[0] = parent_node.data[child_pos - 1];
+            node.d(0) = parent_node.d(child_pos - 1);
             node.children[0] = left_node.children[left_node.size];
-            parent_node.data[child_pos - 1] = left_node.data[left_node.size - 1];
+            parent_node.d(child_pos - 1) = left_node.d(left_node.size - 1);
             node.size++;
             left_node.size--;
 
@@ -496,17 +538,17 @@ void bpt<Key, Value, N>::merge_node(int node_index) {
     //尝试从右兄弟借
     if(has_right && right_node.size > N/2) {
         if(node.is_leaf) {
-            node.data[node.size] = right_node.data[0];
+            node.d(node.size) = right_node.d(0);
             node.size++;
-            for(int i = 0; i < right_node.size - 1; i++) right_node.data[i] = right_node.data[i+1];
+            for(int i = 0; i < right_node.size - 1; i++) right_node.d(i) = right_node.d(i+1);
             right_node.size--;
-            parent_node.data[child_pos] = right_node.data[0];
+            parent_node.d(child_pos) = right_node.d(0);
         } else {
-            node.data[node.size] = parent_node.data[child_pos];
+            node.d(node.size) = parent_node.d(child_pos);
             node.children[node.size + 1] = right_node.children[0];
-            parent_node.data[child_pos] = right_node.data[0];
+            parent_node.d(child_pos) = right_node.d(0);
             node.size++;
-            for(int i = 0; i < right_node.size - 1; i++) right_node.data[i] = right_node.data[i+1];
+            for(int i = 0; i < right_node.size - 1; i++) right_node.d(i) = right_node.d(i+1);
             for(int i = 0; i < right_node.size; i++) right_node.children[i] = right_node.children[i+1];
             right_node.size--;
 
@@ -527,7 +569,7 @@ void bpt<Key, Value, N>::merge_node(int node_index) {
         int left_index = parent_node.children[child_pos - 1];
         if(node.is_leaf) {
             for(int i = 0; i < node.size; i++) {
-                left_node.data[left_node.size + i] = node.data[i];
+                left_node.d(left_node.size + i) = node.d(i);
             }
             left_node.size += node.size;
             left_node.right = node.right;
@@ -538,9 +580,9 @@ void bpt<Key, Value, N>::merge_node(int node_index) {
                 mr.update(next_node, node.right);
             }
         } else {
-            left_node.data[left_node.size] = parent_node.data[child_pos - 1];
+            left_node.d(left_node.size) = parent_node.d(child_pos - 1);
             for(int i = 0; i < node.size; i++) {
-                left_node.data[left_node.size + 1 + i] = node.data[i];
+                left_node.d(left_node.size + 1 + i) = node.d(i);
             }
             for(int i = 0; i <= node.size; i++) {
                 left_node.children[left_node.size + 1 + i] = node.children[i];
@@ -556,7 +598,7 @@ void bpt<Key, Value, N>::merge_node(int node_index) {
         mr.update(left_node, left_index);
 
         for(int i = child_pos - 1; i < parent_node.size - 1; i++) {
-            parent_node.data[i] = parent_node.data[i + 1];
+            parent_node.d(i) = parent_node.d(i + 1);
         }
         for(int i = child_pos; i < parent_node.size; i++) {
             parent_node.children[i] = parent_node.children[i + 1];
@@ -575,7 +617,7 @@ void bpt<Key, Value, N>::merge_node(int node_index) {
         int right_index = parent_node.children[child_pos + 1];
         if(node.is_leaf) {
             for(int i = 0; i < right_node.size; i++) {
-                node.data[node.size + i] = right_node.data[i];
+                node.d(node.size + i) = right_node.d(i);
             }
             node.size += right_node.size;
             node.right = right_node.right;
@@ -586,9 +628,9 @@ void bpt<Key, Value, N>::merge_node(int node_index) {
                 mr.update(next_node, right_node.right);
             }
         } else {
-            node.data[node.size] = parent_node.data[child_pos];
+            node.d(node.size) = parent_node.d(child_pos);
             for(int i = 0; i < right_node.size; i++) {
-                node.data[node.size + 1 + i] = right_node.data[i];
+                node.d(node.size + 1 + i) = right_node.d(i);
             }
             for(int i = 0; i <= right_node.size; i++) {
                 node.children[node.size + 1 + i] = right_node.children[i];
@@ -604,7 +646,7 @@ void bpt<Key, Value, N>::merge_node(int node_index) {
         mr.update(node, node_index);
 
         for(int i = child_pos; i < parent_node.size - 1; i++) {
-            parent_node.data[i] = parent_node.data[i + 1];
+            parent_node.d(i) = parent_node.d(i + 1);
         }
         for(int i = child_pos + 1; i < parent_node.size; i++) {
             parent_node.children[i] = parent_node.children[i + 1];
@@ -630,7 +672,7 @@ void bpt<Key, Value, N>::remove(const Key& key, const Value& value){
     int id = find_in_Node(node, data);
 
     for(int i = id; i < node.size - 1; i++) {
-        node.data[i] = node.data[i+1];
+        node.d(i) = node.d(i+1);
     }
     node.size--;
     mr.update(node, node_index);
@@ -652,7 +694,7 @@ void bpt<Key, Value, N>::remove(const Key& key, const Value& value){
                 }
             }
             if(child_pos > 0) {
-                parent_node.data[child_pos - 1] = node.data[0];
+                parent_node.d(child_pos - 1) = node.d(0);
                 mr.update(parent_node, curr_node.parent);
                 break;
             }

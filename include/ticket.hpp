@@ -78,9 +78,8 @@ namespace sjtu{
 
             //检查购票者和车次是否存在
             if (!us.is_online(username)) return "-1";
-            auto tv = ts.trainpool.find_all(trainID);
-            if (tv.empty()) return "-1";
-            Train t = tv[0];
+            Train t;
+            if (!ts.trainpool.find_value(trainID, t)) return "-1";
             if (!t.released) return "-1";
 
             //检查车次信息
@@ -102,19 +101,18 @@ namespace sjtu{
 
             // 一次查询当天所有段
             TicketKey tk; tk.trainID = trainID; tk.day = Origin;
-            auto tdVec = ts.ticketPool.find_all(tk);
-
-            bool enough = true;
-            if (!tdVec.empty()) {
+            TicketDay td;
+            bool enough = ts.ticketPool.find_value(tk, td);
+            if (enough) {
                 for (int i = fromIdx; i < toIdx; i++) {
-                    if (tdVec[0].seats[i] < num) { enough = false; break; }
+                    if (td.seats[i] < num) { enough = false; break; }
                 }
-            } else { enough = false; }
+            }
 
             if (enough) {
-                TicketDay td = tdVec[0];
+                TicketDay old_td = td;
                 for (int i = fromIdx; i < toIdx; i++) td.seats[i] -= num;
-                ts.ticketPool.remove(tk, tdVec[0]);
+                ts.ticketPool.remove(tk, old_td);
                 ts.ticketPool.insert(tk, td);
 
                 Order o;
@@ -182,27 +180,18 @@ namespace sjtu{
 
             //输出
             std::cout << orders.size() << std::endl;
-            TrainIDStr lastTid; bool hasCache = false;
-            Train cacheTrain;
             for (int i = orders.size() - 1; i >= 0; i--) {
                 Order& o = orders[i];
+
+
                 const char* statusStr;
                 if (o.status == 0) statusStr = "success";
                 else if (o.status == 1) statusStr = "pending";
                 else statusStr = "refunded";
 
-                Train* tp;
-                if (hasCache && o.trainID == lastTid) {
-                    tp = &cacheTrain;
-                } else {
-                    auto tv = ts.trainpool.find_all(o.trainID);
-                    if (tv.empty()) continue;
-                    cacheTrain = tv[0];
-                    lastTid = o.trainID;
-                    hasCache = true;
-                    tp = &cacheTrain;
-                }
-                Train& t = *tp;
+                auto tv = ts.trainpool.find_all(o.trainID);
+                if (tv.empty()) continue;
+                Train& t = tv[0];
                 int startMin = time_to_min(t.startHour, t.startMin);
 
                 int departAbs = o.dateDay * 1440 + startMin + t.depart[o.fromIdx];
