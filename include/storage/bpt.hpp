@@ -161,12 +161,26 @@ class bpt{
     private:
         MemoryRiver<Node<Key, Value, N>,2> mr;
         int root = -1;
+        Node<Key, Value, N> cached_root;
+        bool root_cached = false;
+        
+        void refresh_root_cache() {
+            if (root <= 0) { root_cached = false; return; }
+            mr.read(cached_root, root);
+            root_cached = true;
+        }
+        
+        void read_root(Node<Key, Value, N>& node) {
+            if (root_cached) node = cached_root;
+            else if (root > 0) { mr.read(node, root); cached_root = node; root_cached = true; }
+        }
         
     public:
         bpt(const string& filename = "bpt"){
             mr.initialise(filename);
             mr.get_info(root,1);
             if (root <= 0) root = -1;
+            if (root > 0) refresh_root_cache();
         }
         ~bpt(){
             mr.write_info(root,1);
@@ -299,6 +313,7 @@ void bpt<Key, Value, N>::split_Node(int node_index){
 
         root = mr.write(new_root);//写入新根并更新root
         mr.write_info(root,1);
+        refresh_root_cache();
         node.parent = root;
         new_splited_Node.parent = root;
         mr.update(node, node_index);
@@ -351,12 +366,13 @@ void bpt<Key, Value, N>::insert(const Key& key, const Value& value) {
         new_node.size = 1;
         root = mr.write(new_node);
         mr.write_info(root,1);
+        refresh_root_cache();
         return;
     }
 
     int current_index = root;
     Node<Key, Value, N> current_Node;
-    mr.read(current_Node,root);//读出根，从根开始匹配
+    read_root(current_Node);//读出根，从根开始匹配
 
     while(!current_Node.is_leaf) {
         int id = find_child_in_Node(current_Node, data);
@@ -378,13 +394,12 @@ void bpt<Key, Value, N>::insert(const Key& key, const Value& value) {
     //处理块的大小
     if(current_Node.size <= N) {
         mr.update(current_Node, current_index);
-        return;
     }
     else {//需要分裂块 
         mr.update(current_Node, current_index);
         split_Node(current_index);
     }
-
+    refresh_root_cache();
 }
 
 template<class Key, class Value, int N>
@@ -399,7 +414,7 @@ sjtu::vector<Value> bpt<Key, Value, N>::find_all(const Key& key) {
 
     int current_index = root;
     Node<Key, Value, N> current_Node;
-    mr.read(current_Node,root);//读出根，从根开始匹配，这个与insert类似
+    read_root(current_Node);//读出根，从根开始匹配，这个与insert类似
     while(!current_Node.is_leaf) {
         int id = find_child_in_Node(current_Node, data_l);
         current_index = current_Node.children[id];//更新进入子树
@@ -432,7 +447,7 @@ int bpt<Key, Value, N>::find_(const Key& key, const Value& value) {//重载find�
         return -1;
     }
 
-    mr.read(current_Node,root);//读出根，从根开始匹配，这个与insert类似
+    read_root(current_Node);//读出根，从根开始匹配，这个与insert类似
     while(!current_Node.is_leaf) {
         int id = find_child_in_Node(current_Node, data);
         current_index = current_Node.children[id];//更新进入子树
@@ -450,7 +465,7 @@ bool bpt<Key, Value, N>::find_value(const Key& key, Value& out) {
     if (root <= 0) return false;
     int current_index = root;
     Node<Key, Value, N> current_Node;
-    mr.read(current_Node, root);
+    read_root(current_Node);
     while (!current_Node.is_leaf) {
         // 只比较 key 找子节点（避免值比较导致错误分支）
         int id = 0;
@@ -482,9 +497,11 @@ void bpt<Key, Value, N>::merge_node(int node_index) {
             root_node.parent = -1;
             mr.update(root_node, root);
             mr.write_info(root, 1);
+            refresh_root_cache();
         } else if(node.size == 0) {
             root = -1;
             mr.write_info(root, 1);
+            root_cached = false;
         }
         return;
     }
@@ -705,11 +722,13 @@ void bpt<Key, Value, N>::remove(const Key& key, const Value& value){
     if(node.parent == -1 && node.size == 0) {
         root = -1;
         mr.write_info(root, 1);
+        root_cached = false;
         return;
     }
 
     if(node.size < N/2 && node.parent != -1) {
         merge_node(node_index);
     }
+    refresh_root_cache();
 }
 #endif

@@ -5,6 +5,8 @@
 #include "../include/ticket.hpp"
 
 int main(){
+    std::ios::sync_with_stdio(false);
+    std::cin.tie(0);
     sjtu::users us;
     sjtu::Trains ts;
     sjtu::TicketSystem tks;
