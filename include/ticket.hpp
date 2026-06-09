@@ -35,6 +35,10 @@ namespace sjtu{
         int price; 
         int timestamp;
         Order() : status(0), fromIdx(0), toIdx(0), dateDay(0), num(0), price(0), timestamp(0) {}
+        Order(int st, const TrainIDStr& tid, const StationStr& fs, const StationStr& ts,
+              int fi, int ti, int dd, int n, int p, int ts_)
+            : status(st), trainID(tid), fromStation(fs), toStation(ts),
+              fromIdx(fi), toIdx(ti), dateDay(dd), num(n), price(p), timestamp(ts_) {}
         bool operator<(const Order& o) const {
             return timestamp < o.timestamp;
         }
@@ -115,35 +119,13 @@ namespace sjtu{
                 ts.ticketPool.remove(tk, old_td);
                 ts.ticketPool.insert(tk, td);
 
-                Order o;
-                o.status = 0;
-                o.trainID  = trainID;
-                o.fromStation = fromSta;
-                o.toStation = toSta;
-                o.fromIdx = fromIdx;
-                o.toIdx = toIdx;
-                o.dateDay = Origin;
-                o.num = num;
-                o.price = totalPrice;
-                o.timestamp = r.timestamp_;
-
+                Order o(0, trainID, fromSta, toSta, fromIdx, toIdx, Origin, num, totalPrice, r.timestamp_);
                 orderPool.insert(username, o);//插入购票记录
                 return std::to_string(totalPrice);
             }
 
             if (flag) {//可以进入队列后补
-                Order o;
-                o.status = 1;
-                o.trainID = trainID;
-                o.fromStation = fromSta;
-                o.toStation = toSta;
-                o.fromIdx = fromIdx;
-                o.toIdx = toIdx;
-                o.dateDay = Origin;
-                o.num = num;
-                o.price = totalPrice;
-                o.timestamp = r.timestamp_;
-
+                Order o(1, trainID, fromSta, toSta, fromIdx, toIdx, Origin, num, totalPrice, r.timestamp_);
                 orderPool.insert(username, o);
 
                 PendingEntry pe;
