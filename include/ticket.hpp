@@ -172,14 +172,14 @@ namespace sjtu{
 
             //检查登录
             if (!us.is_online(username)) {
-                std::cout << "-1" << std::endl;
+                std::cout << "-1" << "\n";
                 return;
             }
 
             auto orders = orderPool.find_all(username);
 
             //输出
-            std::cout << orders.size() << std::endl;
+            std::cout << orders.size() << "\n";
             for (int i = orders.size() - 1; i >= 0; i--) {
                 Order& o = orders[i];
 
@@ -203,7 +203,7 @@ namespace sjtu{
                           << o.toStation << " "
                           << abs_to_str(arriveAbs) << " "
                           << o.price / o.num << " "
-                          << o.num << std::endl;
+                          << o.num << "\n";
             }
         }
 
@@ -215,7 +215,7 @@ namespace sjtu{
 
             //检查登录
             if (!us.is_online(username)) {
-                std::cout << "-1" << std::endl;
+                std::cout << "-1" << "\n";
                 return;
             }
 
@@ -233,7 +233,7 @@ namespace sjtu{
             }
 
             if (targetIdx == -1 || orders[targetIdx].status == 2) {
-                std::cout << "-1" << std::endl;
+                std::cout << "-1" << "\n";
                 return;
             }
 
@@ -242,7 +242,7 @@ namespace sjtu{
             //对火车释放座位
             auto tv = ts.trainpool.find_all(target.trainID);
             if (tv.empty()) {
-                std::cout << "-1" << std::endl;
+                std::cout << "-1" << "\n";
                 return;
             }
             //success订单才释放座位
@@ -278,7 +278,7 @@ namespace sjtu{
                 process_pending(ts, target.trainID, target.dateDay);
             }
 
-            std::cout << "0" << std::endl;
+            std::cout << "0" << "\n";
         }
 
     private:

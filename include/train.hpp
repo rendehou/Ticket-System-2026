@@ -248,20 +248,20 @@ namespace sjtu{
 
             //日期不在运营范围内
             if (m < 6 || m > 8) {
-                std::cout << "-1" << std::endl;
+                std::cout << "-1" << "\n";
                 return;
             }
 
             Train t;
             if (!trainpool.find_value(id, t)) {
-                std::cout << "-1" << std::endl;
+                std::cout << "-1" << "\n";
                 return;
             }
             int base_day = date_to_day(m, d);
 
             // 日期不在该车次销售区间内
             if (base_day < t.saleBeginIdx || base_day > t.saleEndIdx) {
-                std::cout << "-1" << std::endl;
+                std::cout << "-1" << "\n";
                 return;
             }
 
@@ -272,7 +272,7 @@ namespace sjtu{
             TicketDay td;
             bool has_td = ticketPool.find_value(tkey, td);
 
-            std::cout << t.TrainID << " " << t.type << std::endl;
+            std::cout << t.TrainID << " " << t.type << "\n";
 
             for (int i = 0; i < t.stationNum; ++i) {
                 std::string arr_str;
@@ -299,7 +299,7 @@ namespace sjtu{
                 else {
                     seat_str = has_td ? std::to_string(td.seats[i]) : std::to_string(t.seatNum);
                 }
-                std::cout << t.stations[i] << " " << arr_str << " -> " << dep_str << " " << t.cum_price[i] << " " << seat_str << std::endl;
+                std::cout << t.stations[i] << " " << arr_str << " -> " << dep_str << " " << t.cum_price[i] << " " << seat_str << "\n";
             }
         }
 
@@ -343,7 +343,7 @@ namespace sjtu{
 
             // 日期不在运营范围内 (6-8月)
             if (m < 6 || m > 8) {
-                std::cout << "0" << std::endl;
+                std::cout << "0" << "\n";
                 return;
             }
 
@@ -421,7 +421,7 @@ namespace sjtu{
                     candidates[b + 1] = key;
                 }
             } 
-            std::cout << candidates.size() << std::endl;
+            std::cout << candidates.size() << "\n";
 
             for (int a = 0; a < candidates.size(); ++a) {
                 TicketCandidate& c = candidates[a];
@@ -433,7 +433,7 @@ namespace sjtu{
                     << c.toStation << " "
                     << abs_to_str(c.arrive_time) << " "
                     << c.price << " "
-                    << c.seat << std::endl;
+                    << c.seat << "\n";
             }
         }
 
@@ -451,7 +451,7 @@ namespace sjtu{
 
             //日期不在运营范围内
             if (m < 6 || m > 8) {
-                std::cout << "0" << std::endl;
+                std::cout << "0" << "\n";
                 return;
             }
 
@@ -564,7 +564,7 @@ namespace sjtu{
                 }
             } 
             if (!valid) {
-                std::cout << "0" << std::endl;
+                std::cout << "0" << "\n";
                 return;
             }
 
@@ -580,7 +580,7 @@ namespace sjtu{
 
             std::cout << t1.TrainID << " " << t1.stations[best.fromID1] << " "
                     << abs_to_str(dep1) << " -> " << t1.stations[best.midID1] << " "
-                    << abs_to_str(arr1) << " " << price1 << " " << seat1 << std::endl;
+                    << abs_to_str(arr1) << " " << price1 << " " << seat1 << "\n";
 
             //输出第二辆车
             auto tv2 = trainpool.find_all(best.train2);
@@ -593,7 +593,7 @@ namespace sjtu{
 
             std::cout << t2.TrainID << " " << t2.stations[best.midID2] << " "
                     << abs_to_str(dep2) << " -> " << t2.stations[best.toID2] << " "
-                    << abs_to_str(arr2) << " " << price2 << " " << seat2 << std::endl;
+                    << abs_to_str(arr2) << " " << price2 << " " << seat2 << "\n";
         }
     };
 };

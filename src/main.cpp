@@ -22,38 +22,38 @@ int main(){
         switch (r.keyword) {
         case sjtu::keywords::AddUser:
             if (us.insert(r)) {
-                std::cout << "[" << r.timestamp_ << "] 0" << std::endl;
+                std::cout << "[" << r.timestamp_ << "] 0" << "\n";
             } 
             else {
-                std::cout << "[" << r.timestamp_ << "] -1" << std::endl;
+                std::cout << "[" << r.timestamp_ << "] -1" << "\n";
             }
             break;
 
         case sjtu::keywords::Login:
             if (us.login(r)) {
-                std::cout << "[" << r.timestamp_ << "] 0" << std::endl;
+                std::cout << "[" << r.timestamp_ << "] 0" << "\n";
             } 
             else {
-                std::cout << "[" << r.timestamp_ << "] -1" << std::endl;
+                std::cout << "[" << r.timestamp_ << "] -1" << "\n";
             }
             break;
 
         case sjtu::keywords::Logout:
             if (us.logout(r)) {
-                std::cout << "[" << r.timestamp_ << "] 0" << std::endl;
+                std::cout << "[" << r.timestamp_ << "] 0" << "\n";
             } 
             else {
-                std::cout << "[" << r.timestamp_ << "] -1" << std::endl;
+                std::cout << "[" << r.timestamp_ << "] -1" << "\n";
             }
             break;
 
         case sjtu::keywords::QueryProfile: {
             std::string info = us.query_profile(r);
             if (info == "-1") {
-                std::cout << "[" << r.timestamp_ << "] -1" << std::endl;
+                std::cout << "[" << r.timestamp_ << "] -1" << "\n";
             } 
             else {
-                std::cout << "[" << r.timestamp_ << "] " << info << std::endl;
+                std::cout << "[" << r.timestamp_ << "] " << info << "\n";
             }
             break;
         }
@@ -61,10 +61,10 @@ int main(){
         case sjtu::keywords::ModifyProfile: {
             std::string info = us.modify_profile(r);
             if (info == "-1") {
-                std::cout << "[" << r.timestamp_ << "] -1" << std::endl;
+                std::cout << "[" << r.timestamp_ << "] -1" << "\n";
             } 
             else {
-                std::cout << "[" << r.timestamp_ << "] " << info << std::endl;
+                std::cout << "[" << r.timestamp_ << "] " << info << "\n";
             }
             break;
         }
@@ -72,28 +72,28 @@ int main(){
 
         case sjtu::keywords::AddTrain:
             if (ts.add_train(r)) {
-                std::cout << "[" << r.timestamp_ << "] 0" << std::endl;
+                std::cout << "[" << r.timestamp_ << "] 0" << "\n";
             } 
             else {
-                std::cout << "[" << r.timestamp_ << "] -1" << std::endl;
+                std::cout << "[" << r.timestamp_ << "] -1" << "\n";
             }
             break;
 
         case sjtu::keywords::DeleteTrain:
             if (ts.delete_train(r)) {
-                std::cout << "[" << r.timestamp_ << "] 0" << std::endl;
+                std::cout << "[" << r.timestamp_ << "] 0" << "\n";
             } 
             else {
-                std::cout << "[" << r.timestamp_ << "] -1" << std::endl;
+                std::cout << "[" << r.timestamp_ << "] -1" << "\n";
             }
             break;
 
         case sjtu::keywords::ReleaseTrain:
             if (ts.release_train(r)) {
-                std::cout << "[" << r.timestamp_ << "] 0" << std::endl;
+                std::cout << "[" << r.timestamp_ << "] 0" << "\n";
             } 
             else {
-                std::cout << "[" << r.timestamp_ << "] -1" << std::endl;
+                std::cout << "[" << r.timestamp_ << "] -1" << "\n";
             }
             break;
 
@@ -114,7 +114,7 @@ int main(){
 
         case sjtu::keywords::BuyTicket: {
             std::string ret = tks.buy_ticket(r, ts, us);
-            std::cout << "[" << r.timestamp_ << "] " << ret << std::endl;
+            std::cout << "[" << r.timestamp_ << "] " << ret << "\n";
             break;
         }
 
@@ -129,11 +129,11 @@ int main(){
             break;
 
         case sjtu::keywords::Clean:
-            std::cout << "[" << r.timestamp_ << "] 0" << std::endl;
+            std::cout << "[" << r.timestamp_ << "] 0" << "\n";
             break;
 
         case sjtu::keywords::Exit:
-            std::cout << "[" << r.timestamp_ << "] bye" << std::endl;
+            std::cout << "[" << r.timestamp_ << "] bye" << "\n";
             return 0;
 
         default:

@@ -23,12 +23,8 @@ private:
     }
 public:
     MemoryRiver() = default;
-
     MemoryRiver(const string& file_name) : file_name(file_name) {}
-
-    ~MemoryRiver() {
-        if (file.is_open()) file.close();
-    }
+    ~MemoryRiver() { if (file.is_open()) file.close(); }
 
     void initialise(string FN = "") {
         if (FN != "") file_name = FN;
@@ -48,7 +44,6 @@ public:
         file.open(file_name, std::ios::in|std::ios::out|std::ios::binary);
     }
 
-    //读出第n个int的值赋给tmp，1_base
     void get_info(int &tmp, int n) {
         if (n > info_len) return;
         ensure_open();
@@ -56,23 +51,17 @@ public:
         file.clear();
         file.seekg((n-1)*sizeof(int));
         file.read(reinterpret_cast<char *>(&tmp), sizeof(int));
-        /* your code here */
     }
 
-    //将tmp写入第n个int的位置，1_base
     void write_info(int tmp, int n) {
         if (n > info_len) return;
         ensure_open();
         if(!file.is_open()) return;
         file.clear();
-        file.seekp((n-1)*sizeof(int));//注意一会来查一下这里是n还是n-1
+        file.seekp((n-1)*sizeof(int));
         file.write(reinterpret_cast<char *>(&tmp),sizeof(int));
-        /* your code here */
     }
 
-    //在文件合适位置写入类对象t，并返回写入的位置索引index
-    //位置索引意味着当输入正确的位置索引index，在以下三个函数中都能顺利的找到目标对象进行操作
-    //位置索引index可以取为对象写入的起始位置
     int write(T &t) {
         ensure_open();
         if(!file.is_open()) return 0;
@@ -81,34 +70,25 @@ public:
         int index = file.tellp();
         file.write(reinterpret_cast<char *>(&t),sizeofT);
         return index;
-        /* your code here */
     }
 
-    //用t的值更新位置索引index对应的对象，保证调用的index都是由write函数产生
     void update(T &t, const int index) {
         ensure_open();
         if(!file.is_open()) return;
         file.clear();
         file.seekp(index);
         file.write(reinterpret_cast<char *>(&t),sizeofT);
-        /* your code here */
     }
 
-    //读出位置索引index对应的T对象的值并赋值给t，保证调用的index都是由write函数产生
     void read(T &t, const int index) {
         ensure_open();
         if(!file.is_open()) return;
         file.clear();
         file.seekg(index);
         file.read(reinterpret_cast<char *>(&t),sizeofT);
-        /* your code here */
     }
 
-    //删除位置索引index对应的对象(不涉及空间回收时，可忽略此函数)，保证调用的index都是由write函数产生
-    void Delete(int index) {
-        
-        /* your code here */
-    }
+    void Delete(int index) { /* your code here */ }
 };
 
 template<class Key, class Value, int N = 50>
@@ -192,6 +172,7 @@ class bpt{
         void split_Node(int node_index);
         int find_(const Key& key, const Value& value);//返回找到的位置（节点index）
         bool find_value(const Key& key, Value& out);//直接返回值，跳过vector
+        void find_values_batch(const Key* keys, Value* values, bool* found, int count);//批量查，keys有序
         void merge_node(int node_index);
 };
 template<class Key, class Value, int N = 50>
@@ -481,6 +462,46 @@ bool bpt<Key, Value, N>::find_value(const Key& key, Value& out) {
         }
     }
     return false;
+}
+
+// 批量查找：keys必须升序。找到keys[0]的叶子后沿right指针走，一次遍历匹配全部
+template<class Key, class Value, int N>
+void bpt<Key, Value, N>::find_values_batch(const Key* keys, Value* values, bool* found, int count) {
+    if (root <= 0 || count <= 0) return;
+    for (int i = 0; i < count; i++) found[i] = false;
+    
+    // 找包含keys[0]的叶子
+    int cur = root;
+    Node<Key, Value, N> node;
+    read_root(node);
+    while (!node.is_leaf) {
+        int id = 0;
+        while (id < node.size && !(keys[0] < node.d(id).key)) id++;
+        cur = node.children[id];
+        mr.read(node, cur);
+    }
+    
+    int ki = 0;
+    while (cur != -1 && ki < count) {
+        // 跳过整个叶子如果它的max < 当前要找的key
+        if (node.size > 0 && node.d(node.size - 1).key < keys[ki]) {
+            cur = node.right;
+            if (cur != -1) mr.read(node, cur);
+            continue;
+        }
+        for (int i = 0; i < node.size && ki < count; i++) {
+            const Key& lk = node.d(i).key;
+            while (ki < count && keys[ki] < lk) ki++;
+            if (ki >= count) break;
+            if (keys[ki] == lk) {
+                values[ki] = node.d(i).value;
+                found[ki] = true;
+                ki++;
+            }
+        }
+        cur = node.right;
+        if (cur != -1) mr.read(node, cur);
+    }
 }
 
 template<class Key, class Value, int N>
