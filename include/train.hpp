@@ -21,8 +21,8 @@ namespace sjtu{
         }
     };
     struct TicketDay {
-        int seats[100];
-        TicketDay() { for(int i=0;i<100;i++) seats[i]=0; }
+        int seats[40];
+        TicketDay() { for(int i=0;i<40;i++) seats[i]=0; }
         bool operator<(const TicketDay& o) const { return false; }
         bool operator==(const TicketDay& o) const { return true; }
     };
@@ -60,20 +60,20 @@ namespace sjtu{
     public:
         TrainIDStr TrainID;
         int stationNum;      
-        StationStr stations[100];
+        StationStr stations[40];
         int seatNum;   
-        int prices[100];                   
+        int prices[40];                   
         int startHour, startMin;           
-        int travelTimes[100];              
-        int stopoverTimes[100];            
+        int travelTimes[40];              
+        int stopoverTimes[40];            
         int saleBeginMonth, saleBeginDay;  
         int saleEndMonth, saleEndDay;
         char type;                        
         bool released;
         //前缀和数组
-        int arrive[101];
-        int depart[101];
-        int cum_price[101];
+        int arrive[41];
+        int depart[41];
+        int cum_price[41];
         int saleBeginIdx, saleEndIdx;
         
         bool operator<(const Train& o) const { return TrainID < o.TrainID; }
@@ -129,21 +129,21 @@ namespace sjtu{
             t.TrainID = TrainIDStr(r.data[7].c_str()); 
             t.stationNum = std::stoi(r.data[8]); 
             t.seatNum = std::stoi(r.data[9]); 
-            split_stations(r.data[10], t.stations, 100); 
-            split_ints(r.data[11], t.prices, 100);   
+            split_stations(r.data[10], t.stations, 40); 
+            split_ints(r.data[11], t.prices, 40);   
 
             //出发时间
             size_t colon = r.data[12].find(':');
             t.startHour = std::stoi(r.data[12].substr(0, colon));
             t.startMin  = std::stoi(r.data[12].substr(colon + 1));
-            split_ints(r.data[13], t.travelTimes, 100); 
+            split_ints(r.data[13], t.travelTimes, 40); 
 
             //停站时间
             if (r.data[14] == "_") {
                 t.stopoverTimes[0] = 0;
             } 
             else {
-                split_ints(r.data[14], t.stopoverTimes, 100);
+                split_ints(r.data[14], t.stopoverTimes, 40);
             }
 
             //可以买票的日期区间
