@@ -1,78 +1,86 @@
-# 火车票管理系统
-
-SJTU CS1951 课程大作业
-
-## 概况
-
-### 作业安排
 
 
-本作业分为两个部分。
+## 仓库结构
 
-在第一部分中，需要实现一个基于文件的 B+ 树。
+```
+├── CMakeLists.txt
+├── .gitignore
+├── include
+│   ├── ticket.hpp
+│   ├── train.hpp
+│   ├── user.hpp
+│   ├── storage
+│   │   └── bpt.hpp
+│   └── utils
+│       ├── chinese_string.hpp
+│       ├── fixed_string.hpp
+│       ├── parser.hpp
+│       ├── string_check.hpp
+│       ├── time.hpp
+│       ├── vector
+│       │   ├── vector.hpp
+│       │   ├── exceptions.hpp
+│       │   └── utility.hpp
+│       └── map
+│           └── src
+│               ├── map.hpp
+│               ├── exceptions.hpp
+│               └── utility.hpp
+└── src
+    └── main.cpp
+```
 
-在第二部分中，需要实现一个火车票管理系统。此部分要求使用 Git 开发，维持良好的项目管理习惯。此部分的中期检查等检查方式均会通过查看登记的 Git 仓库链接，因此如果想更换仓库的链接请及时联系助教。
+## 文件概述
 
-### 作业周期
+`storage/bpt.hpp` 实现了一个外存中的 B+ 树模板类 `bpt<Key, Value, N>`，基于 `MemoryRiver` 以二进制形式在磁盘上存取任意类型记录，将 Key 映射到文件中的记录偏移，支持 `insert`、`remove`、`find_all`、`find_value`、`find_values_batch` 等操作，内部实现了节点分裂、合并及兄弟间借数据。
 
-- B+ 树: 2026-04-27（第 9 周周一）~ 2025-05-25（第 13 周周一）
+`utils/vector/vector.hpp`、`utils/map/src/map.hpp` 实现了与 STL 接近的 `vector`、`map` 的功能。
 
-## 评分标准
+`utils/fixed_string.hpp` 实现了定长字符串 `FixedString<N>`，在栈上存储避免堆分配，派生 `UsernameStr`、`PasswordStr`、`MailStr`、`TrainIDStr`。`utils/chinese_string.hpp` 实现了 UTF-8 中文字符串 `ChineseString<MaxChars>`，派生 `NameStr`（≤5 汉字）、`StationStr`（≤10 汉字）。
 
-本作业占本课程总成绩 15%，其中 B+ 树占 7%，管理系统占 8%。
+`utils/time.hpp` 实现了日期（2026 年 6~8 月）与时刻的转换函数，如 `date_to_day`、`day_to_date`、`time_to_min`、`min_to_str`、`abs_to_str` 等。
 
-- B+ 树: 7%
-  - OJ 测试（仅题 [3091](https://acm.sjtu.edu.cn/OnlineJudge/problem/3091)，不含压力测试）: 80%
-  - Code Review: 20%
+`utils/parser.hpp` 实现了一个命令解析器，将输入命令按 `-<key> <argument>` 格式拆分并存入 `result` 结构体，便于指令与各模块的交互。`utils/string_check.hpp` 实现了各字段的合法性校验（username、password、name、mail、trainID、station 等）。
 
-bonus 另外计算，计入平时分总分，且不超过总分的 1%。
+`user.hpp` 实现了 `User` 类与 `users` 用户管理类，支持添加用户、登录、登出、查询用户信息、修改用户信息等操作。
 
-## B+ 树 - 7%
+`train.hpp` 实现了 `Train` 类（内部维护到达/出发时间与累计票价的前缀和）与 `Trains` 火车票管理类，支持添加火车、删除火车、发布火车、查询车次、查询车票、查询换乘等功能。
 
-### 作业要求
+`ticket.hpp` 实现了 `Order` 订单类（状态：成功/候补/已退）、`PendingEntry` 候补订单类与 `TicketSystem` 购票类，支持购票（含候补）、查询订单、退票等功能，退票后自动触发 `process_pending` 按序兑现候补。
 
-作业要求实现基于 BPT 的外存管理系统。在本作业中，只允许调用以下头文件中的函数和类：
+## 数据库设计
 
-iostream, string, cstdio, cmath, string, fstream, filesystem
+##### 核心思想：
 
-不允许使用这些头文件包含的 STL 容器 (如 `std::vector`) 或算法 (如 `std::sort`)。唯一的例外是，你可以使用 `std::string`。如果需要用到其他与算法、数据结构无关的标准库，请向助教提出请求。
+用 `MemoryRiver` 储存信息，将信息在文件中的索引与某个 key 绑定存入 B+ 树。查询时通过 B+ 树先查到索引，再从文件索引位置读出信息。
 
-你需要在最后通过 [OJ 测试](https://acm.sjtu.edu.cn/OnlineJudge/problem/3091)。
+##### users (userpool):
 
-注意：建议使用类模板以方便后续完成管理系统。
+`//key为username，value为索引的B+树`
+`bpt<UsernameStr, User> userpool{"userpool"}; `
 
-### 负责助教
+##### Trains (trainpool + ticket_pool + station_idx):
 
-张博钜 张煊 丁宣铭
+`//key为trainID，value为索引的B+树`
+`bpt<TrainIDStr, Train, 40> trainpool{"trainpool"}; `
 
-## 管理系统 - 8%
+`//key为station，value为列车索引的B+树`
+`bpt<StationStr, StationEntry, 100> stationIdx{"station_idx"}; //记录经过station的车的索引`
 
-见 [管理系统文档](management_system.md)。
+`//key为(trainID, day)，value为当日各区段余票`
+`bpt<TicketKey, TicketDay, 150> ticketPool{"ticket_pool"}; //存放余票信息`
 
-数据压缩包下发在群里。
+##### TicketSystem (order_pool + pending_pool):
 
-### 负责助教
-顾元熙，卓翔，楼灏，于恩帝
+`//key为username，value为订单索引的B+树`
+`bpt<UsernameStr, Order, 100> orderPool{"order_pool"};`
 
+`//存放订单信息，每个Order在文件中的位置与其username作为键值对插入到BPT中`
 
-## Bonus
+`//key为trainID+发售天数，value为候补订单索引的B+树`
+`bpt<PendingKey, PendingEntry> pendingPool{"pending_pool"};`
 
-见 [Bonus 文档](bonus.md)。
-
-准备自行设计并实现其他 bonus 的同学可以联系助教协商。
-
-## 扣分
-
-请保证自己项目结构的可读性，可以包括优化项目结构、完善 README 的内容、适当的文件树指南等，晦涩难懂的项目可能会加大助教的工作量，也可能会影响你的成绩（B+ 树阶段此条可忽略）。
-
-**如有出现任何抄袭现象按 0 分计，并按照违反学术诚信的操作办法处理。**
+`//存放候补订单信息，每个PendingEntry在文件中的位置与其购买的车次+天数作为键值对插入到BPT中`
 
 
-### 中期检查
-
-由于火车票后端设计难度较大，请同学们 **务必** 在设计好清晰的文件结构以及代码框架后再动手。
-为了督促同学们的完成进度，我们将在 **6月4日（星期四）** 进行一次中期检查，检查内容包含：
-- 仓库代码，要求建好各模块的文件，设计好基本的类（包含数据成员）以及几个基本的函数接口（要求有函数签名）
-- 口头回答对 `query_transfer` 的设计
-中期检查效果不理想的同学可能会被扣除5%以内的分数。
   

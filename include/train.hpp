@@ -8,7 +8,7 @@
 #include "utils/map/src/map.hpp"
 
 namespace sjtu{
-    // 票池 Key: 车次 + 天（一次查全部段）
+    //按天查车次的售票情况
     struct TicketKey {
         TrainIDStr trainID;
         int day;
@@ -22,11 +22,13 @@ namespace sjtu{
     };
     struct TicketDay {
         int seats[40];
-        TicketDay() { for(int i=0;i<40;i++) seats[i]=0; }
+        TicketDay() { 
+            for(int i=0;i<40;i++) seats[i]=0; 
+        }
         bool operator<(const TicketDay& o) const { return false; }
         bool operator==(const TicketDay& o) const { return true; }
     };
-
+    //将一整句的车站读开
     inline int split_stations(const std::string& src, StationStr* out, int maxN) {
         int cnt = 0; 
         std::string cur;
@@ -96,8 +98,8 @@ namespace sjtu{
     private:
         bpt<StationStr, StationEntry, 100> stationIdx{"station_idx"};
     public:
-        bpt<TrainIDStr, Train, 20> trainpool{"trainpool"};
-        bpt<TicketKey, TicketDay> ticketPool{"ticket_pool"};
+        bpt<TrainIDStr, Train, 40> trainpool{"trainpool"};
+        bpt<TicketKey, TicketDay, 150> ticketPool{"ticket_pool"};
 
         // 预计算前缀和
         void pre(Train& t) {
@@ -303,7 +305,7 @@ namespace sjtu{
             }
         }
 
-        struct TicketCandidate {
+        struct TicketCandidate {//买票的所有成员
             TrainIDStr trainID;
             int fromIdx, toIdx;//在火车车站中的编号
             int price;  
@@ -359,6 +361,7 @@ namespace sjtu{
             
             sjtu::vector<TicketCandidate> candidates;//所有的待选车
 
+            //先对头尾车站来查找火车，各自返回一个vector，他们按照火车名字有序，用双指针查找重合即可
             int i = 0, j = 0;
             while(i < v_departure.size() && j < v_destination.size()) {
                 if(v_departure[i].trainID < v_destination[j].trainID) i++;
@@ -375,8 +378,8 @@ namespace sjtu{
                             int Origin = date - (start_min + t.depart[dep_id]) / 1440; 
                             if (Origin >= t.saleBeginIdx && Origin <= t.saleEndIdx) {
                                 int remain = get_ticket(t.TrainID,Origin,dep_id,dest_id);
-
                                 {
+                                    //存入与买票相关的类里
                                     TicketCandidate c;
                                     c.trainID = t.TrainID;
                                     c.fromIdx = dep_id;
@@ -425,7 +428,7 @@ namespace sjtu{
 
             for (int a = 0; a < candidates.size(); ++a) {
                 TicketCandidate& c = candidates[a];
-
+                //输出
                 std::cout
                     << c.trainID << " "
                     << c.fromStation << " "
@@ -445,6 +448,18 @@ namespace sjtu{
         };
 
         void query_transfer(const result& r) {
+            /*
+            在恰好换乘一次（换乘同一辆车不算恰好换乘一次）的情况下查询符合条件的车次，仅输出最优解。
+            最优解的定义如下:
+            * 若`(-p time)` 则总时间作为第一关键字，总价格作为第二关键字，第一辆车的 `Train ID` 作为第三关键字，第二辆车 `Train ID` 作为第四关键字。
+            * 若`(-p cost)` 则总价格作为第一关键字，总时间作为第二关键字，第一辆车的 `Train ID` 作为第三关键字，第二辆车 `Train ID` 作为第四关键字。
+            保证任意两种方案关键字均不同。
+            请注意：这里的日期是列车从 `-s` 出发的日期，不是从列车始发站出发的日期。
+        - 返回值
+            查询失败（没有符合要求的车次）：`0`
+
+            查询成功：输出2行，换乘中搭乘的两个车次，格式同 `query_ticket`。
+            */
             //读入并切分输入信息
             int m = std::stoi(r.data[15].substr(0,2));
             int d = std::stoi(r.data[15].substr(3,2));
@@ -467,21 +482,25 @@ namespace sjtu{
             sjtu::vector<StationEntry> v_destination; v_destination = stationIdx.find_all(to);
 
             for(int i = 0;i < v_departure.size();i++){
+                //读取基本信息
                 TrainIDStr tid1 = v_departure[i].trainID;
                 int start_station = v_departure[i].stationIndex;
                 auto tv = trainpool.find_all(tid1);
                 if(!tv[0].released) continue;
-
+                
+                //判定时间
                 Train& t1 = tv[0];
                 int start_min1 = time_to_min(t1.startHour,t1.startMin);
                 int Origin1 = date - (start_min1 + t1.depart[start_station]) / 1440;
                 if (Origin1 < t1.saleBeginIdx || Origin1 > t1.saleEndIdx) continue;
 
+                //转换时间
                 for(int j = start_station + 1;j < tv[0].stationNum;j++){
                     int arrive_time = Origin1 * 1440 + start_min1 + t1.arrive[j];
                     StationStr transfer = tv[0].stations[j];
                     auto mid_list = stationIdx.find_all(transfer);
                     
+                    //思路类似ticket，用双指针遍历
                     for(int p = 0; p < mid_list.size(); p++) {
                         for(int q = 0; q < v_destination.size(); q++) {
                             if(!(mid_list[p].trainID == v_destination[q].trainID)) continue;
